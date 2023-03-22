@@ -8,7 +8,9 @@ use rust_htslib::{
         Read,
     },
 };
+use std::sync::mpsc::channel;
 use std::{cmp::Ordering, collections::HashMap, path::PathBuf, process::exit};
+use threadpool::ThreadPool;
 #[derive(Parser, Debug)]
 #[command(name = "excord-LR")]
 #[command(author = "Xinchang Zheng <zhengxc93@gmail.com>")]
@@ -138,121 +140,129 @@ fn main() {
         exit(1)
     }
 
+    let n_workers = 4;
+    let pool = ThreadPool::new(n_workers);
+
     let mut bam = bam::Reader::from_path(_bam).unwrap();
-
+    // let (tx, rx) = channel();
     for r in bam.records() {
-        let mut record = r.unwrap();
-        let st = record.strand().to_owned(); // MUST move out of match, Because of mutable borrow by strand().
-        match record.aux("SA".as_bytes()) {
-            Ok(_sa) => {
-                let mut alignment_vec: Vec<AlignmentPos> = Vec::new();
+        // let tx = tx.clone();
+        pool.execute(move || {
+            let mut record = r.unwrap();
+            let st = record.strand().to_owned(); // MUST move out of match, Because of mutable borrow by strand().
+            match record.aux("SA".as_bytes()) {
+                Ok(_sa) => {
+                    let mut alignment_vec: Vec<AlignmentPos> = Vec::new();
 
-                /* put the preliminary alignment to  */
-                let contig_name = record.contig();
-                let pos = record.pos();
-                let strand = match st {
-                    ReqStrand::Forward => 1,
-                    ReqStrand::Reverse => -1,
-                };
-                let mapq = record.mapq();
-                let cigar_stats_nuc = record.cigar_stats_nucleotides();
-                let mut cigar_map = HashMap::new();
-                cigar_stats_nuc.iter().for_each(|x| {
-                    /*
-                        Match(u32),    // M
-                        Ins(u32),      // I
-                        Del(u32),      // D
-                        RefSkip(u32),  // N
-                        SoftClip(u32), // S
-                        HardClip(u32), // H
-                        Pad(u32),      // P
-                        Equal(u32),    // =
-                        Diff(u32),     // X
-                        ps:
-                        Match(u32)
-                                |--------Type of this Enum
-                    */
-                    match x {
-                        (&Cigar::Del(_), &n) => {
-                            // println!("Del:is: {}", n);
-                            cigar_map.insert('D', n.to_owned());
+                    /* put the preliminary alignment to  */
+                    let contig_name = record.contig();
+                    let pos = record.pos();
+                    let strand = match st {
+                        ReqStrand::Forward => 1,
+                        ReqStrand::Reverse => -1,
+                    };
+                    let mapq = record.mapq();
+                    let cigar_stats_nuc = record.cigar_stats_nucleotides();
+                    let mut cigar_map = HashMap::new();
+                    cigar_stats_nuc.iter().for_each(|x| {
+                        /*
+                            Match(u32),    // M
+                            Ins(u32),      // I
+                            Del(u32),      // D
+                            RefSkip(u32),  // N
+                            SoftClip(u32), // S
+                            HardClip(u32), // H
+                            Pad(u32),      // P
+                            Equal(u32),    // =
+                            Diff(u32),     // X
+                            ps:
+                            Match(u32)
+                                    |--------Type of this Enum
+                        */
+                        match x {
+                            (&Cigar::Del(_), &n) => {
+                                // println!("Del:is: {}", n);
+                                cigar_map.insert('D', n.to_owned());
+                            }
+                            (&Cigar::Match(_), &n) => {
+                                // println!("Match:is: {}", n);
+                                cigar_map.insert('M', n.to_owned());
+                            }
+                            (&Cigar::Ins(_), &n) => {
+                                // println!("Match:is: {}", n);
+                                cigar_map.insert('I', n.to_owned());
+                            }
+                            (&Cigar::RefSkip(_), &n) => {
+                                // println!("Match:is: {}", n);
+                                cigar_map.insert('N', n.to_owned());
+                            }
+                            (&Cigar::SoftClip(_), &n) => {
+                                // println!("Match:is: {}", n);
+                                cigar_map.insert('S', n.to_owned());
+                            }
+                            (&Cigar::HardClip(_), &n) => {
+                                // println!("Match:is: {}", n);
+                                cigar_map.insert('H', n.to_owned());
+                            }
+                            (&Cigar::Pad(_), &n) => {
+                                // println!("Match:is: {}", n);
+                                cigar_map.insert('P', n.to_owned());
+                            }
+                            (&Cigar::Equal(_), &n) => {
+                                // println!("Match:is: {}", n);
+                                cigar_map.insert('=', n.to_owned());
+                            }
+                            (&Cigar::Diff(_), &n) => {
+                                // println!("Match:is: {}", n);
+                                cigar_map.insert('X', n.to_owned());
+                            }
                         }
-                        (&Cigar::Match(_), &n) => {
-                            // println!("Match:is: {}", n);
-                            cigar_map.insert('M', n.to_owned());
-                        }
-                        (&Cigar::Ins(_), &n) => {
-                            // println!("Match:is: {}", n);
-                            cigar_map.insert('I', n.to_owned());
-                        }
-                        (&Cigar::RefSkip(_), &n) => {
-                            // println!("Match:is: {}", n);
-                            cigar_map.insert('N', n.to_owned());
-                        }
-                        (&Cigar::SoftClip(_), &n) => {
-                            // println!("Match:is: {}", n);
-                            cigar_map.insert('S', n.to_owned());
-                        }
-                        (&Cigar::HardClip(_), &n) => {
-                            // println!("Match:is: {}", n);
-                            cigar_map.insert('H', n.to_owned());
-                        }
-                        (&Cigar::Pad(_), &n) => {
-                            // println!("Match:is: {}", n);
-                            cigar_map.insert('P', n.to_owned());
-                        }
-                        (&Cigar::Equal(_), &n) => {
-                            // println!("Match:is: {}", n);
-                            cigar_map.insert('=', n.to_owned());
-                        }
-                        (&Cigar::Diff(_), &n) => {
-                            // println!("Match:is: {}", n);
-                            cigar_map.insert('X', n.to_owned());
+                    });
+                    alignment_vec.push(AlignmentPos::new(
+                        &contig_name,
+                        &pos,
+                        cigar_map,
+                        &strand,
+                        &mapq,
+                    ));
+
+                    /* process the supplementary alignments */
+                    if let Aux::String(sa) = _sa {
+                        let sa_list = sa.split(";").collect::<Vec<&str>>();
+                        let sa_list_clean = sa_list.iter().filter(|x| x.len() > 0);
+                        for single_sa in sa_list_clean {
+                            // println!("{}", single_sa);
+                            alignment_vec.push(parse_supplementary_alignment(single_sa));
                         }
                     }
-                });
-                alignment_vec.push(AlignmentPos::new(
-                    &contig_name,
-                    &pos,
-                    cigar_map,
-                    &strand,
-                    &mapq,
-                ));
 
-                /* process the supplementary alignments */
-                if let Aux::String(sa) = _sa {
-                    let sa_list = sa.split(";").collect::<Vec<&str>>();
-                    let sa_list_clean = sa_list.iter().filter(|x| x.len() > 0);
-                    for single_sa in sa_list_clean {
-                        // println!("{}", single_sa);
-                        alignment_vec.push(parse_supplementary_alignment(single_sa));
+                    alignment_vec.sort_by(|a, b| alignment_pos_cmp(a, b));
+
+                    // println!("{:?}", alignment_vec);
+
+                    for i in 1..alignment_vec.len() {
+                        let j = i - 1;
+                        let a: &AlignmentPos = &alignment_vec[j];
+                        let b: &AlignmentPos = &alignment_vec[i];
+                        println!(
+                            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                            a.chrom,
+                            a.start,
+                            a.end,
+                            a.strand,
+                            b.chrom,
+                            b.start,
+                            b.end,
+                            b.strand,
+                            alignment_vec.len() - 1
+                        );
                     }
                 }
+                Err(_) => {}
+            };
 
-                alignment_vec.sort_by(|a, b| alignment_pos_cmp(a, b));
-
-                // println!("{:?}", alignment_vec);
-
-                for i in 1..alignment_vec.len() {
-                    let j = i - 1;
-                    let a: &AlignmentPos = &alignment_vec[j];
-                    let b: &AlignmentPos = &alignment_vec[i];
-                    println!(
-                        "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
-                        a.chrom,
-                        a.start,
-                        a.end,
-                        a.strand,
-                        b.chrom,
-                        b.start,
-                        b.end,
-                        b.strand,
-                        alignment_vec.len() - 1
-                    );
-                }
-            }
-            Err(_) => {}
-        };
+            // tx.send(1).unwrap();
+        });
 
         //
     }

@@ -10,3 +10,4 @@ clap={version="*",features=['derive']}
 # noodles = { version = "0.34.0", features = ["bam"] }
 rust-htslib = { version = "*"}
 bio-types={ version = "*"}
+threadpool="*"
