@@ -1,5 +1,5 @@
 
-Extract Structural Variation signals in Long Reads BAM. This program is a Rust re-implementation of [excord](https://github.com/brentp/excord) which is used to [STIX](https://github.com/ryanlayer/stix). This program only consider split reads.
+Extract Structural Variation signals in Long Reads BAM. This program is a Rust re-implementation of [excord](https://github.com/brentp/excord) which is used to generate indexes for [STIX](https://github.com/ryanlayer/stix). Currently, this program only consider split reads.
 
 # How to use
 
