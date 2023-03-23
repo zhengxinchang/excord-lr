@@ -8,7 +8,7 @@ use rust_htslib::{
         Read,
     },
 };
-use std::{cmp::Ordering, collections::HashMap, path::PathBuf, process::exit};
+use std::{cmp::Ordering, collections::HashMap, path::{PathBuf, Path}, process::exit, io::{BufWriter, Write, self}, fs::File, env};
 #[derive(Parser, Debug)]
 #[command(name = "excord-LR")]
 #[command(author = "Xinchang Zheng <zhengxc93@gmail.com>")]
@@ -129,6 +129,17 @@ fn parse_supplementary_alignment(s: &str) -> AlignmentPos {
     AlignmentPos::new(chrom, &(pos - 1), cigar_str, &strand.unwrap(), &mapq)
 }
 
+fn absolute_path(path: impl AsRef<Path>) -> io::Result<PathBuf> {
+    let path = path.as_ref();
+    let absolute_path = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        env::current_dir()?.join(path)
+    };
+
+    Ok(absolute_path)
+}
+
 fn main() {
     let cli = Cli::parse();
     // println!("{:?}", &cli);
@@ -137,9 +148,21 @@ fn main() {
         println!("Ivalid BAM file path: {} ", _bam.to_str().unwrap());
         exit(1)
     }
-
+    // handel -o option
+    let t = cli.out;
+    let mut _outprefix_ancestors = t.ancestors().clone();
+    _outprefix_ancestors.next();
+    let mut _outprefix_parent = _outprefix_ancestors.next().unwrap().to_path_buf();
+    let _outprefix_parent_abs = absolute_path(_outprefix_parent).unwrap();
+    if !_outprefix_parent_abs.is_dir() {
+        println!(
+            "Output directory does not exists: {} ",
+            _outprefix_parent_abs.to_str().unwrap()
+        );
+        exit(1);
+    }
+    let mut f = BufWriter::new(File::create(t).unwrap());
     let mut bam = bam::Reader::from_path(_bam).unwrap();
-
     for r in bam.records() {
         let mut record = r.unwrap();
         let st = record.strand().to_owned(); // MUST move out of match, Because of mutable borrow by strand().
@@ -237,8 +260,8 @@ fn main() {
                     let j = i - 1;
                     let a: &AlignmentPos = &alignment_vec[j];
                     let b: &AlignmentPos = &alignment_vec[i];
-                    println!(
-                        "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                    let bed_line =                     format!(
+                        "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
                         a.chrom,
                         a.start,
                         a.end,
@@ -249,6 +272,19 @@ fn main() {
                         b.strand,
                         alignment_vec.len() - 1
                     );
+                    f.write(bed_line.as_bytes()).unwrap();
+                    // println!(
+                    //     "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                    //     a.chrom,
+                    //     a.start,
+                    //     a.end,
+                    //     a.strand,
+                    //     b.chrom,
+                    //     b.start,
+                    //     b.end,
+                    //     b.strand,
+                    //     alignment_vec.len() - 1
+                    // );
                 }
             }
             Err(_) => {}
@@ -256,4 +292,6 @@ fn main() {
 
         //
     }
+    
+    
 }
