@@ -24,6 +24,6 @@ Options:
 * CPU: AMD Ryzen 7 3700X 8-Core Processor
 * RAM: 16GB
 
-|Sample|Reads Number|excord(s)|excord-lr(s)|
+|Sample|Reads Number|excord(second)|excord-lr(second)|
 | --: | --: | --: | --: |
 | Sample1 |21526088 |505.24 |127.67|
