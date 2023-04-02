@@ -5,7 +5,7 @@ use rust_htslib::{
     bam::{
         ext::BamRecordExtensions,
         record::{Aux, Cigar},
-        Read,
+        Read, Record,
     },
 };
 use std::{cmp::Ordering, collections::HashMap, path::{PathBuf, Path}, process::exit, io::{BufWriter, Write, self}, fs::File, env};
@@ -163,8 +163,15 @@ fn main() {
     }
     let mut f = BufWriter::new(File::create(t).unwrap());
     let mut bam = bam::Reader::from_path(_bam).unwrap();
-    for r in bam.records() {
-        let mut record = r.unwrap();
+    bam.set_threads(8 as usize).unwrap();
+    let mut record = Record::new();
+    // for r in bam.records() {
+    while let Some(result) = bam.read(&mut record){
+        match result {
+            Err(_) =>{break}
+            Ok(()) =>{}
+        }
+        // let mut record = r.unwrap();
         let st = record.strand().to_owned(); // MUST move out of match, Because of mutable borrow by strand().
         match record.aux("SA".as_bytes()) {
             Ok(_sa) => {

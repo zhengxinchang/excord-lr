@@ -27,3 +27,12 @@ Options:
 |Sample|Reads Number|excord(second)|excord-lr(second)|
 | --: | --: | --: | --: |
 | Sample1 |21526088 |505.24 |127.67|
+
+
+
+* CPU: AMD Ryzen 7 PRO 6850HS with Radeon Graphics
+* RAM: 32GB
+
+|Sample|Reads Number|excord(second)|excord-lr(second)|
+| --: | --: | --: | --: |
+| Sample1 |21526088 |548.99 |73.073|
