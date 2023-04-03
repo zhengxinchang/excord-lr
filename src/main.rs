@@ -4,11 +4,19 @@ use rust_htslib::{
     bam,
     bam::{
         ext::BamRecordExtensions,
-        record::{Aux, Cigar},
+        record::{Aux, Cigar, CigarStringView},
         Read, Record,
     },
 };
-use std::{cmp::Ordering, collections::HashMap, path::{PathBuf, Path}, process::exit, io::{BufWriter, Write, self}, fs::File, env};
+use std::{
+    cmp::Ordering,
+    collections::HashMap,
+    env,
+    fs::File,
+    io::{self, BufWriter, Write},
+    path::{Path, PathBuf},
+    process::exit,
+};
 #[derive(Parser, Debug)]
 #[command(name = "excord-LR")]
 #[command(author = "Xinchang Zheng <zhengxc93@gmail.com>")]
@@ -30,6 +38,10 @@ struct Cli {
     #[arg(short = 'Q', long, default_value_t = 1540)]
     excludeflag: u16,
 
+    /// Threads
+    #[arg(short, long, default_value_t = 8)]
+    thread: usize,
+
     /// Output file name
     #[arg(short, long)]
     out: PathBuf,
@@ -43,6 +55,7 @@ struct AlignmentPos {
     cigar_map: HashMap<char, i32>,
     strand: i32, // true = forward
     mapq: u8,
+    raw_cigar: String,
 }
 
 impl AlignmentPos {
@@ -52,6 +65,7 @@ impl AlignmentPos {
         cigar_map: HashMap<char, i32>,
         strand: &i32,
         mapq: &u8,
+        cigar_string: &str,
     ) -> AlignmentPos {
         let end =
             start + (*cigar_map.get(&'D').unwrap()) as i64 + (*cigar_map.get(&'M').unwrap()) as i64
@@ -66,17 +80,66 @@ impl AlignmentPos {
         AlignmentPos {
             chrom: String::from(chrom_clean),
             start: *start,
-            end: end,
+            end: end + 1,
             cigar_map: cigar_map,
             strand: *strand,
             mapq: *mapq,
+            raw_cigar: cigar_string.to_string(),
         }
     }
 }
 
+fn find_first_match_pos(cigar_str: &str) -> i64 {
+    let mut p = 0i64;
+    let mut p_string = "".to_string();
+    for c in cigar_str.chars() {
+        if c != 'D'
+            && c != 'M'
+            && c != 'I'
+            && c != 'H'
+            && c != 'S'
+            && c != 'P'
+            && c != 'X'
+            && c != '='
+            && c != 'N'
+        {
+            p_string += &c.to_string();
+        } else {
+            if c == 'M' {
+                break;
+            } else {
+                p += p_string.parse::<i64>().unwrap();
+                p_string = "".to_string();
+            }
+        }
+    }
+    dbg!(cigar_str, p);
+    return p;
+}
+
+// From brentp:
+// output splitters. Splitters are ordered by their offset into the read.
+// given, cigars of:
+// A:20S30M100S
+// B:50S30M50S
+// C:90S30M30S
+// we would order them as they are listed. We would output bedpe intervals
+// for A-B, and B-C
+fn splitter_order_cmp(a: &AlignmentPos, b: &AlignmentPos) -> Ordering {
+    // dbg!(a, b, a.chrom.cmp(&b.chrom));
+
+    // let a_raw_cigar_string = a.raw_cigar.clone();
+    // let b_raw_cigar_string = b.raw_cigar.clone();
+    let a_first_match_pos = find_first_match_pos(&a.raw_cigar);
+    let b_first_match_pos = find_first_match_pos(&b.raw_cigar);
+    a_first_match_pos.cmp(&b_first_match_pos)
+}
+
 fn alignment_pos_cmp(a: &AlignmentPos, b: &AlignmentPos) -> Ordering {
+    // dbg!(a,b,a.chrom.cmp(&b.chrom));
+
     if a.chrom.cmp(&b.chrom) != Ordering::Equal {
-        a.chrom.cmp(&b.chrom)
+        a.chrom.as_bytes().cmp(&b.chrom.as_bytes())
     } else {
         a.start.cmp(&b.start)
     }
@@ -125,8 +188,14 @@ fn parse_supplementary_alignment(s: &str) -> AlignmentPos {
     let cigar_str = parse_cigar(sa_vec[3]);
     let mapq = sa_vec[4].parse::<u8>().unwrap();
     let _nm = sa_vec[5].parse::<i64>().unwrap();
-
-    AlignmentPos::new(chrom, &(pos - 1), cigar_str, &strand.unwrap(), &mapq)
+    AlignmentPos::new(
+        chrom,
+        &(pos - 1),
+        cigar_str,
+        &strand.unwrap(),
+        &mapq,
+        &sa_vec[3],
+    )
 }
 
 fn absolute_path(path: impl AsRef<Path>) -> io::Result<PathBuf> {
@@ -163,15 +232,17 @@ fn main() {
     }
     let mut f = BufWriter::new(File::create(t).unwrap());
     let mut bam = bam::Reader::from_path(_bam).unwrap();
-    bam.set_threads(8 as usize).unwrap();
+    bam.set_threads(cli.thread).unwrap();
     let mut record = Record::new();
     // for r in bam.records() {
-    while let Some(result) = bam.read(&mut record){
+    while let Some(result) = bam.read(&mut record) {
         match result {
-            Err(_) =>{break}
-            Ok(()) =>{}
+            Err(_) => break,
+            Ok(()) => {}
         }
-        // let mut record = r.unwrap();
+        if record.is_secondary()|| record.is_unmapped() || record.mapq() < cli.mapq || (record.flags() & cli.excludeflag) == 0 {
+            continue;
+        }
         let st = record.strand().to_owned(); // MUST move out of match, Because of mutable borrow by strand().
         match record.aux("SA".as_bytes()) {
             Ok(_sa) => {
@@ -186,6 +257,7 @@ fn main() {
                 };
                 let mapq = record.mapq();
                 let cigar_stats_nuc = record.cigar_stats_nucleotides();
+
                 let mut cigar_map = HashMap::new();
                 cigar_stats_nuc.iter().for_each(|x| {
                     /*
@@ -202,6 +274,7 @@ fn main() {
                         Match(u32)
                                 |--------Type of this Enum
                     */
+
                     match x {
                         (&Cigar::Del(_), &n) => {
                             // println!("Del:is: {}", n);
@@ -241,12 +314,66 @@ fn main() {
                         }
                     }
                 });
+
+                let mut first_cigar_str = "".to_string();
+                // dbg!(&record.cigar());
+                record.cigar().iter().for_each(|cigar| {
+                    match cigar {
+                        &Cigar::Del(n) => {
+                            // println!("Del:is: {}", n);
+                            first_cigar_str += &n.to_owned().to_string();
+                            first_cigar_str += &"D".to_string();
+                        }
+                        &Cigar::Match(n) => {
+                            // println!("Match:is: {}", n);
+                            first_cigar_str += &n.to_owned().to_string();
+                            first_cigar_str += &"M".to_string();
+                        }
+                        &Cigar::Ins(n) => {
+                            // println!("Match:is: {}", n);
+                            first_cigar_str += &n.to_owned().to_string();
+                            first_cigar_str += &"I".to_string();
+                        }
+                        &Cigar::RefSkip(n) => {
+                            // println!("Match:is: {}", n);
+                            first_cigar_str += &n.to_owned().to_string();
+                            first_cigar_str += &"N".to_string();
+                        }
+                        &Cigar::SoftClip(n) => {
+                            // println!("Match:is: {}", n);
+                            first_cigar_str += &n.to_owned().to_string();
+                            first_cigar_str += &"S".to_string();
+                        }
+                        &Cigar::HardClip(n) => {
+                            // println!("Match:is: {}", n);
+                            first_cigar_str += &n.to_owned().to_string();
+                            first_cigar_str += &"H".to_string();
+                        }
+                        &Cigar::Pad(n) => {
+                            // println!("Match:is: {}", n);
+                            first_cigar_str += &n.to_owned().to_string();
+                            first_cigar_str += &"P".to_string();
+                        }
+                        &Cigar::Equal(n) => {
+                            // println!("Match:is: {}", n);
+                            first_cigar_str += &n.to_owned().to_string();
+                            first_cigar_str += &"=".to_string();
+                        }
+                        &Cigar::Diff(n) => {
+                            // println!("Match:is: {}", n);
+                            first_cigar_str += &n.to_owned().to_string();
+                            first_cigar_str += &"X".to_string();
+                        }
+                    }
+                });
+
                 alignment_vec.push(AlignmentPos::new(
                     &contig_name,
                     &pos,
                     cigar_map,
                     &strand,
                     &mapq,
+                    &first_cigar_str,
                 ));
 
                 /* process the supplementary alignments */
@@ -258,28 +385,48 @@ fn main() {
                         alignment_vec.push(parse_supplementary_alignment(single_sa));
                     }
                 }
-
-                alignment_vec.sort_by(|a, b| alignment_pos_cmp(a, b));
-
+                dbg!(record.flags());
+                alignment_vec.sort_by(|a, b| splitter_order_cmp(a, b));
+                // dbg!(alignment_vec);
                 // println!("{:?}", alignment_vec);
-
+                // dbg!(&alignment_vec);
                 for i in 1..alignment_vec.len() {
                     let j = i - 1;
                     let a: &AlignmentPos = &alignment_vec[j];
                     let b: &AlignmentPos = &alignment_vec[i];
-                    let bed_line =                     format!(
-                        "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
-                        a.chrom,
-                        a.start,
-                        a.end,
-                        a.strand,
-                        b.chrom,
-                        b.start,
-                        b.end,
-                        b.strand,
-                        alignment_vec.len() - 1
-                    );
+                    let mut bed_line = "".to_string();
+                    if alignment_pos_cmp(a, b) == Ordering::Less {
+                        bed_line = format!(
+                            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+                            a.chrom,
+                            a.start,
+                            a.end,
+                            a.strand,
+                            b.chrom,
+                            b.start,
+                            b.end,
+                            b.strand,
+                            alignment_vec.len() - 1,
+                            "excord-lr"
+                        );
+                    } else {
+                        bed_line = format!(
+                            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+                            b.chrom,
+                            b.start,
+                            b.end,
+                            b.strand,
+                            a.chrom,
+                            a.start,
+                            a.end,
+                            a.strand,
+                            alignment_vec.len() - 1,
+                            "excord-lr"
+                        );
+                    }
+
                     f.write(bed_line.as_bytes()).unwrap();
+
                     // println!(
                     //     "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
                     //     a.chrom,
@@ -293,12 +440,9 @@ fn main() {
                     //     alignment_vec.len() - 1
                     // );
                 }
+                alignment_vec.clear();
             }
             Err(_) => {}
         };
-
-        //
     }
-    
-    
 }

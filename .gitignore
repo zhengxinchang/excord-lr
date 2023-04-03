@@ -15,5 +15,6 @@ Cargo.lock
 /target
 /test/
 Makefile
-
-a
+test*
+a*
+b*

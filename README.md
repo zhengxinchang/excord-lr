@@ -19,7 +19,7 @@ Options:
 
 # Performance
 
-**Hardware**
+**Test1**
 
 * CPU: AMD Ryzen 7 3700X 8-Core Processor
 * RAM: 16GB
@@ -29,6 +29,7 @@ Options:
 | Sample1 |21526088 |505.24 |127.67|
 
 
+**Test2**
 
 * CPU: AMD Ryzen 7 PRO 6850HS with Radeon Graphics
 * RAM: 32GB
