@@ -11,6 +11,7 @@ Options:
   -b, --bam <BAM>                  Path to BAM file
   -F, --mapq <MAPQ>                Minimal MapQ [default: 1]
   -Q, --excludeflag <EXCLUDEFLAG>  Exclude Flags [default: 1540]
+  -t, --thread <THREAD>            Threads [default: 8]
   -o, --out <OUT>                  Output file name
   -h, --help                       Print help
   -V, --version                    Print version
