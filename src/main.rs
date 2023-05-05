@@ -3,7 +3,7 @@ use clap::Parser;
 use rust_htslib::{
     bam,
     bam::{
-        ext::BamRecordExtensions,
+        // ext::BamRecordExtensions,
         record::{Aux, Cigar},
         Read, Record,
     },
@@ -47,7 +47,7 @@ struct Cli {
     out: PathBuf,
 }
 
-#[derive(Debug)]
+// #[derive(Debug)]
 struct AlignmentPos {
     chrom: String,
     start: i64,
@@ -117,27 +117,26 @@ fn find_first_match_pos(cigar_str: &str) -> i64 {
     return p;
 }
 
-// From brentp:
-// output splitters. Splitters are ordered by their offset into the read.
-// given, cigars of:
-// A:20S30M100S
-// B:50S30M50S
-// C:90S30M30S
-// we would order them as they are listed. We would output bedpe intervals
-// for A-B, and B-C
+/// # Compare two Alignment
+/// 
+/// From brentp:
+/// 
+/// ```
+/// output splitters. Splitters are ordered by their offset into the read.
+/// given, cigars of:
+/// A:20S30M100S
+/// B:50S30M50S
+/// C:90S30M30S
+/// we would order them as they are listed. We would output bedpe intervals
+/// for A-B, and B-C
+/// ```
 fn splitter_order_cmp(a: &AlignmentPos, b: &AlignmentPos) -> Ordering {
-    // dbg!(a, b, a.chrom.cmp(&b.chrom));
-
-    // let a_raw_cigar_string = a.raw_cigar.clone();
-    // let b_raw_cigar_string = b.raw_cigar.clone();
     let a_first_match_pos = find_first_match_pos(&a.raw_cigar);
     let b_first_match_pos = find_first_match_pos(&b.raw_cigar);
     a_first_match_pos.cmp(&b_first_match_pos)
 }
 
 fn alignment_pos_cmp(a: &AlignmentPos, b: &AlignmentPos) -> Ordering {
-    // dbg!(a,b,a.chrom.cmp(&b.chrom));
-
     if a.chrom.cmp(&b.chrom) != Ordering::Equal {
         a.chrom.as_bytes().cmp(&b.chrom.as_bytes())
     } else {
@@ -211,7 +210,6 @@ fn absolute_path(path: impl AsRef<Path>) -> io::Result<PathBuf> {
 
 fn main() {
     let cli = Cli::parse();
-    // println!("{:?}", &cli);
     let _bam = cli.bam;
     if !_bam.is_file() {
         println!("Ivalid BAM file path: {} ", _bam.to_str().unwrap());
@@ -235,7 +233,6 @@ fn main() {
     bam.set_threads(cli.thread).unwrap();
     let mut record = Record::new();
     let mut alignment_vec: Vec<AlignmentPos> = Vec::new();
-    // for r in bam.records() {
 
     while let Some(result) = bam.read(&mut record) {
         match result {
@@ -389,18 +386,6 @@ fn main() {
                         );
                     }
                     f.write(bed_line.as_bytes()).unwrap();
-                    // println!(
-                    //     "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
-                    //     a.chrom,
-                    //     a.start,
-                    //     a.end,
-                    //     a.strand,
-                    //     b.chrom,
-                    //     b.start,
-                    //     b.end,
-                    //     b.strand,
-                    //     alignment_vec.len() - 1
-                    // );
                 }
             }
             Err(_) => {}
