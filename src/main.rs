@@ -5,7 +5,8 @@ use rust_htslib::{
     bam::{
         // ext::BamRecordExtensions,
         record::{Aux, Cigar},
-        Read, Record,
+        Read,
+        Record,
     },
 };
 use std::{
@@ -20,7 +21,7 @@ use std::{
 #[derive(Parser, Debug)]
 #[command(name = "excord-LR")]
 #[command(author = "Xinchang Zheng <zhengxc93@gmail.com>")]
-#[command(version = "0.0.1")]
+#[command(version = "0.1.1")]
 #[command(about = "
 Extract Structural Variation Signals from Long-Read BAMs
 Contact: Xinchang Zheng <zhengxc93@gmail.com>
@@ -42,12 +43,16 @@ struct Cli {
     #[arg(short, long, default_value_t = 8)]
     thread: usize,
 
+    /// Minimal len to define an large indels
+    #[arg(short, long, default_value_t = 30)]
+    indelMin: i64,
+
     /// Output file name
     #[arg(short, long)]
     out: PathBuf,
 }
 
-// #[derive(Debug)]
+#[derive(Debug)]
 struct AlignmentPos {
     chrom: String,
     start: i64,
@@ -89,6 +94,7 @@ impl AlignmentPos {
     }
 }
 
+/// # get the position of the first match base.
 fn find_first_match_pos(cigar_str: &str) -> i64 {
     let mut p = 0i64;
     let mut p_string = "".to_string();
@@ -118,9 +124,9 @@ fn find_first_match_pos(cigar_str: &str) -> i64 {
 }
 
 /// # Compare two Alignment
-/// 
+///
 /// From brentp:
-/// 
+///
 /// ```
 /// output splitters. Splitters are ordered by their offset into the read.
 /// given, cigars of:
@@ -248,9 +254,11 @@ fn main() {
             continue;
         }
         let st = record.strand().to_owned(); // MUST move out of match, Because of mutable borrow by strand().
+                                             // Start to extact SA signals
         match record.aux("SA".as_bytes()) {
             Ok(_sa) => {
                 /* put the preliminary alignment to  */
+                // dbg!(&record.cigar());
                 let contig_name = record.contig();
                 let pos = record.pos();
                 let strand = match st {
@@ -333,6 +341,7 @@ fn main() {
                         cigar_map.insert('X', n.to_owned());
                     }
                 });
+                // dbg!(&contig_name,pos, std::str::from_utf8(record.qname()).unwrap(), &cigar_map);
                 alignment_vec.push(AlignmentPos::new(
                     &contig_name,
                     &pos,
@@ -346,6 +355,7 @@ fn main() {
                 if let Aux::String(sa) = _sa {
                     let sa_list = sa.split(";").collect::<Vec<&str>>();
                     let sa_list_clean = sa_list.iter().filter(|x| x.len() > 0);
+                    // dbg!(&sa_list_clean);
                     for single_sa in sa_list_clean {
                         alignment_vec.push(parse_supplementary_alignment(single_sa));
                     }
@@ -356,6 +366,7 @@ fn main() {
                     let a: &AlignmentPos = &alignment_vec[j];
                     let b: &AlignmentPos = &alignment_vec[i];
                     let bed_line: String;
+                    // dbg!(&a);
                     if alignment_pos_cmp(a, b) == Ordering::Less {
                         bed_line = format!(
                             "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
@@ -391,5 +402,103 @@ fn main() {
             Err(_) => {}
         };
         alignment_vec.clear();
+
+        // parse the CIGAR value for each record
+        let cigar = record.cigar();
+        // dbg!(&cigar.pos());
+        let _ = &cigar.iter().for_each(|x| {
+            // dbg!(&x,&x.len(),&x.char());
+            // match x.char() {
+            //     'D' =>{
+            //         if x.len() >= cli.indelMin {
+            //             // dbg!("catch them".to_string());
+            //             // giggle 其实接受的只是bed文件所以只需要report这个起始和终止就可以了。
+            //             let cigar_str = format!("{}",cigar);
+            //             let strand = match st {
+            //                 ReqStrand::Forward => 1,
+            //                 ReqStrand::Reverse => -1,
+            //             };
+
+            //             let cigar_map = parse_cigar(&cigar_str);
+            //             dbg!(&cigar_map);
+            //             let alignment_pos = AlignmentPos::new(
+            //                 &record.contig(),
+            //                 &record.pos(),
+            //                 cigar_map,
+            //                 &strand,
+            //                 &record.mapq(),
+            //                 &cigar_str
+            //             );
+            //             dbg!(alignment_pos);
+            //         }
+            //     }
+            //     'I' =>{
+            //         if x.len() >= cli.indelMin {
+            //             let cigar_str = format!("{}",cigar);
+            //             let strand = match st {
+            //                 ReqStrand::Forward => 1,
+            //                 ReqStrand::Reverse => -1,
+            //             };
+
+            //             let cigar_map = parse_cigar(&cigar_str);
+            //             dbg!(&cigar_map);
+            //             let alignment_pos = AlignmentPos::new(
+            //                 &record.contig(),
+            //                 &record.pos(),
+            //                 cigar_map,
+            //                 &strand,
+            //                 &record.mapq(),
+            //                 &cigar_str
+            //             );
+            //         }
+            //     },
+            //     _=>{
+
+            //     }
+            // }
+            // for cigar in record.cigar().iter(){
+            //     if cigar == &Cigar::Del(n){
+
+            //     }
+            // }
+            let mut pos = record.pos() as i64;
+            let strand = match record.strand() {
+                ReqStrand::Forward => 1i64,
+                ReqStrand::Reverse => -1i64,
+            };
+            let chrom_clean: String;
+            if record.contig().starts_with(&"chr".to_string()) {
+                chrom_clean = record.contig().strip_prefix(&"chr".to_string()).unwrap().to_string();
+            } else {
+                chrom_clean = record.contig().to_string();
+            }
+            record.cigar().iter().for_each(|cigar| match cigar {
+                &Cigar::Del(n) => {
+                    let m = n as i64;
+                    if m >= cli.indelMin {
+                        let pt = format!("{}\t{}\t{}\t{}\n", chrom_clean, pos, (pos + m), strand);
+                        f.write(pt.as_bytes());
+                        pos += strand * m; //finally add the del length;
+                    } else {
+                        pos += strand * m;
+                    }
+                }
+                &Cigar::Ins(n) => {
+                    let m = n as i64;
+                    if m >= cli.indelMin {
+                        let pt = format!("{}\t{}\t{}\t{}\n", chrom_clean, pos, (pos + m), strand);
+                        f.write(pt.as_bytes());
+                        pos += strand * m; //finally add the del length;
+                    } else {
+                        pos += strand * m;
+                    }
+                }
+                _ => {
+                    pos += strand * (cigar.len() as i64);
+                }
+            });
+        });
+
+        // dbg!("\n\n\n".to_string());
     }
 }
