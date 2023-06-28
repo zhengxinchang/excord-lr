@@ -1,27 +1,27 @@
 
 build:
-	cargo build --release 
+	CC=/usr/bin/musl-gcc  cargo build --release --target=x86_64-unknown-linux-musl
 #cross build --target x86_64-unknown-linux-musl
 
 h:build
-	target/release/excord-lr --help
+	target/x86_64-unknown-linux-musl/release/excord-lr --help
 
 t:build 
-	time target/release/excord-lr -b test/mini_aln.sort.bam -o test/t
+	time target/x86_64-unknown-linux-musl/release/excord-lr -b test/mini_aln.sort.bam -o test/t 
 
 te:
 	time samtools view -b  test/mini_aln.sort.bam |  test/excord  --discordantdistance 500 /dev/stdin  >test/te
 
 t2:build
-	time target/release/excord-lr -b test/full_aln.sort.bam -o test/tt 
+	time target/x86_64-unknown-linux-musl/release/excord-lr -b test/full_aln.sort.bam -o test/tt 
 
 tte:
-	time samtools view -b  test/full_aln.sort.bam |  test/excord  --discordantdistance 500 /dev/stdin  >test/ttex
+	time samtools view -b  test/mini_aln.sort.bam |  test/excord  --discordantdistance 500 /dev/stdin  >test/ttex
 
 t2f:
 	sudo /home/zhengxc/.cargo/bin/flamegraph  \
 	-o my_flamegraph.svg  \
 	-- \
-	target/release/excord-lr   \
+	target/x86_64-unknown-linux-musl/release/excord-lr   \
 	-b test/full_aln.sort.bam \
 	-o test/tt 

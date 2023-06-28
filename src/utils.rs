@@ -1,5 +1,10 @@
-use std::{env, path::{Path, PathBuf}, io, collections::HashMap, cmp::Ordering};
-use crate::aligments_pos::AlignmentPos;
+use crate::split_read_event::SplitReadEvent;
+use std::{
+    cmp::Ordering,
+    collections::HashMap,
+    env, io,
+    path::{Path, PathBuf},
+};
 
 /// # get the position of the first match base.
 pub fn find_first_match_pos(cigar_str: &str) -> i64 {
@@ -43,13 +48,13 @@ pub fn find_first_match_pos(cigar_str: &str) -> i64 {
 /// we would order them as they are listed. We would output bedpe intervals
 /// for A-B, and B-C
 /// ```
-pub fn splitter_order_cmp(a: &AlignmentPos, b: &AlignmentPos) -> Ordering {
+pub fn splitter_order_cmp(a: &SplitReadEvent, b: &SplitReadEvent) -> Ordering {
     let a_first_match_pos = find_first_match_pos(&a.raw_cigar);
     let b_first_match_pos = find_first_match_pos(&b.raw_cigar);
     a_first_match_pos.cmp(&b_first_match_pos)
 }
 
-pub fn alignment_pos_cmp(a: &AlignmentPos, b: &AlignmentPos) -> Ordering {
+pub fn alignment_pos_cmp(a: &SplitReadEvent, b: &SplitReadEvent) -> Ordering {
     if a.chrom.cmp(&b.chrom) != Ordering::Equal {
         a.chrom.as_bytes().cmp(&b.chrom.as_bytes())
     } else {
@@ -88,7 +93,7 @@ pub fn parse_cigar(cigar_str: &str) -> HashMap<char, u32> {
     cigar_map
 }
 
-pub fn parse_supplementary_alignment(s: &str) -> AlignmentPos {
+pub fn parse_supplementary_alignment(s: &str) -> SplitReadEvent {
     let sa_vec: Vec<&str> = s.split(',').collect();
     let chrom = sa_vec[0];
     let pos = sa_vec[1].parse::<i64>().unwrap();
@@ -100,7 +105,7 @@ pub fn parse_supplementary_alignment(s: &str) -> AlignmentPos {
     let cigar_str = parse_cigar(sa_vec[3]);
     let mapq = sa_vec[4].parse::<u8>().unwrap();
     let _nm = sa_vec[5].parse::<i64>().unwrap();
-    AlignmentPos::new(
+    SplitReadEvent::new(
         chrom,
         &(pos - 1),
         cigar_str,

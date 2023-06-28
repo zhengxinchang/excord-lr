@@ -15,5 +15,5 @@ Cargo.lock
 /target
 /test/
 test*
-a*
+/a*
 b*

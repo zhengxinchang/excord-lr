@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 
-
 #[derive(Debug)]
-pub struct AlignmentPos {
+pub struct SplitReadEvent {
     pub chrom: String,
     pub start: i64,
     pub end: i64,
@@ -12,7 +11,7 @@ pub struct AlignmentPos {
     pub raw_cigar: String,
 }
 
-impl AlignmentPos {
+impl SplitReadEvent {
     pub fn new(
         chrom: &str,
         start: &i64,
@@ -20,10 +19,14 @@ impl AlignmentPos {
         strand: &i32,
         mapq: &u8,
         cigar_string: &str,
-    ) -> AlignmentPos {
-        let end =
-            start + (*cigar_map.get(&'D').unwrap()) as i64 + (*cigar_map.get(&'M').unwrap()) as i64
-                - 1i64;
+    ) -> SplitReadEvent {
+        //这里的End计算似乎有问题，需要想一下是否跟strand有关系？
+        let end = start
+            + (*cigar_map.get(&'D').unwrap()) as i64
+            + (*cigar_map.get(&'M').unwrap()) as i64
+            + (*cigar_map.get(&'=').unwrap()) as i64
+            + (*cigar_map.get(&'X').unwrap()) as i64
+            + -1i64;
         let chrom_clean: String;
         if chrom.starts_with(&"chr".to_string()) {
             chrom_clean = chrom.strip_prefix(&"chr".to_string()).unwrap().to_string();
@@ -31,7 +34,7 @@ impl AlignmentPos {
             chrom_clean = chrom.to_string();
         }
 
-        AlignmentPos {
+        SplitReadEvent {
             chrom: String::from(chrom_clean),
             start: *start,
             end: end + 1,
