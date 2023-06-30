@@ -12,7 +12,11 @@ Options:
   -Q, --mapq <MAPQ>                Minimal MapQ [default: 1]
   -F, --excludeflag <EXCLUDEFLAG>  Exclude Flags [default: 1540]
   -t, --thread <THREAD>            Threads [default: 8]
+  -i, --indel-min <INDEL_MIN>      Minimal len to define an SV events in CIGAR [default: 50]
+  -m, --merge-min <MERGE_MIN>      Threshold to merge two adjacent events [default: 5]
+  -n, --not-merge                  Not merge
   -o, --out <OUT>                  Output file name
+  -s, --split-only                 Only report split-read event
   -h, --help                       Print help
   -V, --version                    Print version
 ```
