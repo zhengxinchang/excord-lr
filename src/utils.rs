@@ -40,6 +40,7 @@ pub fn find_first_match_pos(cigar_str: &str) -> i64 {
 /// From brentp:
 ///
 /// ```
+/// 
 /// output splitters. Splitters are ordered by their offset into the read.
 /// given, cigars of:
 /// A:20S30M100S
@@ -58,6 +59,11 @@ pub fn alignment_pos_cmp(a: &SplitReadEvent, b: &SplitReadEvent) -> Ordering {
     if a.chrom.cmp(&b.chrom) != Ordering::Equal {
         a.chrom.as_bytes().cmp(&b.chrom.as_bytes())
     } else {
+        // if a.start.cmp(&b.start) != Ordering::Equal {
+        //     a.start.cmp(&b.start)
+        // }else{
+        //     b.strand.cmp(&a.strand)
+        // }
         a.start.cmp(&b.start)
     }
 }
