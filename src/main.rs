@@ -53,8 +53,12 @@ struct Cli {
     indel_min: u32,
 
     /// Threshold to merge two adjacent events
-    #[arg(short, long, default_value_t = 50)]
+    #[arg(short, long, default_value_t = 5)]
     merge_min: u32,
+
+    /// Not merge
+    #[arg(short, long, default_value_t = false)]
+    not_merge: bool,
 
     /// Output file name
     #[arg(short, long)]
@@ -214,24 +218,26 @@ fn main() {
                         alignment_vec.push(parse_supplementary_alignment(single_sa));
                     }
                 }
+                // dbg!(&std::str::from_utf8(record.qname()),&alignment_vec);
                 alignment_vec.sort_by(|a, b| splitter_order_cmp(a, b));
+                // dbg!(&std::str::from_utf8(record.qname()),&alignment_vec);
                 for i in 1..alignment_vec.len() {
                     let j = i - 1;
                     let a: &SplitReadEvent = &alignment_vec[j];
                     let b: &SplitReadEvent = &alignment_vec[i];
                     let bed_line: String;
                     // dbg!(&a);
-                    if alignment_pos_cmp(a, b) == Ordering::Less {
+                    if alignment_pos_cmp(a, b) == Ordering::Greater {
                         bed_line = format!(
                             "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
-                            a.chrom,
-                            a.start,
-                            a.end,
-                            a.strand,
                             b.chrom,
                             b.start,
                             b.end,
                             b.strand,
+                            a.chrom,
+                            a.start,
+                            a.end,
+                            a.strand,
                             alignment_vec.len() - 1,
                             "excord-lr-split-read",
                             std::str::from_utf8(record.qname()).unwrap(),
@@ -241,14 +247,14 @@ fn main() {
                     } else {
                         bed_line = format!(
                             "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
-                            b.chrom,
-                            b.start,
-                            b.end,
-                            b.strand,
                             a.chrom,
                             a.start,
                             a.end,
                             a.strand,
+                            b.chrom,
+                            b.start,
+                            b.end,
+                            b.strand,
                             alignment_vec.len() - 1,
                             "excord-lr-split-read",
                             std::str::from_utf8(record.qname()).unwrap(),
@@ -288,7 +294,7 @@ fn main() {
                 }
             }
 
-            let mut aligments_event_vec: Vec<AlignmentEvent> = vec![];
+            let mut alignments_event_vec: Vec<AlignmentEvent> = vec![];
             let mut left_consume = 0u32;
             let mut right_consume = total_consume;
             for x in cigar.into_iter() {
@@ -307,7 +313,7 @@ fn main() {
                                 &pos,
                                 &strand,
                             );
-                            aligments_event_vec.push(aligments_event);
+                            alignments_event_vec.push(aligments_event);
                             // dbg!(
                             //     "xxx".to_string(),
                             //     &record.pos(),
@@ -319,7 +325,6 @@ fn main() {
                             //     aligments_event.get_bed_record()
                             // );
                         }
-
                         left_consume += n;
                     }
                     &Cigar::Match(n) => {
@@ -339,13 +344,36 @@ fn main() {
             }
 
             // do merge step
-            
+            let mut merged_alignments_event_vec:Vec<AlignmentEvent> = vec![];
+            for idx in 1..alignments_event_vec.len(){
+                let pidx = idx -1;
+                let a = alignments_event_vec[pidx].clone();
+                let b = alignments_event_vec[idx].clone();
+                dbg!(&cigar,&a,&b, b.lend.abs_diff(a.rstart));
+                if  b.lend.abs_diff(a.rstart) < cli.merge_min  {
+                    let c = AlignmentEvent {
+                        lchrom:a.lchrom,
+                        lstart:a.lstart,
+                        lend:a.lend,
+                        lstrand:a.lstrand,
+                        rchrom:b.rchrom,
+                        rstart:b.rstart,
+                        rend:b.rend,
+                        rstrand:b.rstrand,
+                        events_num:1
+                    };
+                    merged_alignments_event_vec.push(c);
+                }else{
+                    merged_alignments_event_vec.push(a);
+                    merged_alignments_event_vec.push(b);
+                }
+            }
             // print all record
-            aligments_event_vec.into_iter().for_each(|x|{
+            merged_alignments_event_vec.into_iter().for_each(|x|{
                 f.write(x.get_bed_record().as_bytes()).unwrap();
             });
 
-            dbg!(&total_consume);
+            // dbg!(&total_consume);
         }
     }
 }

@@ -26,7 +26,12 @@ pub fn find_first_match_pos(cigar_str: &str) -> i64 {
             if c == 'M' {
                 break;
             } else {
-                p += p_string.parse::<i64>().unwrap();
+
+                // Must used the Query consume according to CIGAR type
+                // S I X = will consume Query
+                if  c == 'S' || c == 'I' || c =='X' || c== '='{
+                    p += p_string.parse::<i64>().unwrap();
+                } 
                 p_string = "".to_string();
             }
         }
@@ -52,7 +57,20 @@ pub fn find_first_match_pos(cigar_str: &str) -> i64 {
 pub fn splitter_order_cmp(a: &SplitReadEvent, b: &SplitReadEvent) -> Ordering {
     let a_first_match_pos = find_first_match_pos(&a.raw_cigar);
     let b_first_match_pos = find_first_match_pos(&b.raw_cigar);
-    a_first_match_pos.cmp(&b_first_match_pos)
+    // dbg!(a,a_first_match_pos,b,b_first_match_pos,a_first_match_pos.cmp(&b_first_match_pos));
+    // dbg!(a_first_match_pos,b_first_match_pos,a_first_match_pos.cmp(&b_first_match_pos));
+    if a_first_match_pos < b_first_match_pos {
+        Ordering::Less
+    }else{
+        if a_first_match_pos > b_first_match_pos{
+            Ordering::Greater
+        }else{
+            Ordering::Equal
+        }
+        
+    }
+    // a_first_match_pos.cmp(&b_first_match_pos)
+    
 }
 
 pub fn alignment_pos_cmp(a: &SplitReadEvent, b: &SplitReadEvent) -> Ordering {

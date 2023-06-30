@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 /// struct for alignment event
 /// left and right reference consume will sum the length of D M = X for the left/right part of d
 pub struct AlignmentEvent {

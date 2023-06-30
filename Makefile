@@ -9,6 +9,11 @@ h:build
 t:build 
 	time target/x86_64-unknown-linux-musl/release/excord-lr -b test/mini_aln.sort.bam -o test/t 
 
+
+tnomerge:build 
+	time target/x86_64-unknown-linux-musl/release/excord-lr -n -b test/mini_aln.sort.bam -o test/t-nomerge 
+
+
 te:
 	time samtools view -b  test/mini_aln.sort.bam |  test/excord  --discordantdistance 500 /dev/stdin  >test/te
 
