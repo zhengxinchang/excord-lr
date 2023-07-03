@@ -29,7 +29,7 @@ use aligments_event::*;
 #[command(version = "0.1.2")]
 #[command(about = "
 Extract Structural Variation Signals from Long-Read BAMs
-Contact: Xinchang Zheng <zhengxc93@gmail.com>
+Contact: Xinchang Zheng <zhengxc93@gmail.com,Xinchang.Zheng@bcm.edu>
 ", long_about = None)]
 struct Cli {
     /// Path to BAM file
@@ -349,7 +349,7 @@ fn main() {
                 let pidx = idx -1;
                 let a = alignments_event_vec[pidx].clone();
                 let b = alignments_event_vec[idx].clone();
-                dbg!(&cigar,&a,&b, b.lend.abs_diff(a.rstart));
+                // dbg!(&cigar,&a,&b, b.lend.abs_diff(a.rstart));
                 if  b.lend.abs_diff(a.rstart) < cli.merge_min  {
                     let c = AlignmentEvent {
                         lchrom:a.lchrom,
@@ -372,8 +372,6 @@ fn main() {
             merged_alignments_event_vec.into_iter().for_each(|x|{
                 f.write(x.get_bed_record().as_bytes()).unwrap();
             });
-
-            // dbg!(&total_consume);
         }
     }
 }
