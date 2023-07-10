@@ -42,7 +42,15 @@ struct Cli {
 
     /// Exclude Flags
     #[arg(short = 'F', long, default_value_t = 1540)]
-    excludeflag: u16,
+    exclude_flag: u16,
+
+    /// Exclude Secondary Alignment
+    #[arg(short = 'S', long, default_value_t = false)]
+    exclude_secondary: bool,
+
+    /// Exclude Unmapped Alignment
+    #[arg(short = 'U', long, default_value_t = false)]
+    exclude_unmapped: bool,
 
     /// Threads
     #[arg(short, long, default_value_t = 8)]
@@ -68,13 +76,17 @@ struct Cli {
     #[arg(short, long, default_value_t = false)]
     split_only: bool,
 
-    /// Only report split-read event
+    /// debug
     #[arg(short, long, default_value_t = false)]
     debug: bool,
 }
 
 fn main() {
     let cli = Cli::parse();
+    if cli.debug {
+        println!(&cli);
+    }
+    
     let _bam = cli.bam;
     if !_bam.is_file() {
         println!("Ivalid BAM file path: {} ", _bam.to_str().unwrap());
@@ -104,14 +116,28 @@ fn main() {
             Err(_) => break, //exit if the last one was processed.
             Ok(()) => {}
         }
-        if record.is_secondary()
-            || record.is_unmapped()
-            || record.mapq() < cli.mapq
-            || (record.flags() & cli.excludeflag) != 0
-        // == 0 means not match with flag.
-        {
+        if cli.exclude_secondary & record.is_secondary() {
+            // dbg!("found secondary", record.qname());
             continue;
         }
+
+        if cli.exclude_unmapped & record.is_unmapped() {
+            // dbg!("found unmapped", record.qname());
+            continue;
+        }
+
+        if record.mapq() < cli.mapq {
+            // dbg!("found low mapq", record.qname());
+            continue;
+        }
+
+        if (record.flags() & cli.exclude_flag) != 0
+        // == 0 means not match with flag.
+        {
+            // dbg!("found wrong flag", record.qname());
+            continue;
+        }
+
         let st = record.strand().to_owned(); // MUST move out of match, Because of mutable borrow by strand().
                                              // Start to extact SA signals
         let contig_name = record.contig();
@@ -234,19 +260,6 @@ fn main() {
                     if alignment_pos_cmp(a, b) == Ordering::Greater {
                         if cli.debug {
                             bed_line = format!(
-                                "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
-                                b.chrom,
-                                b.start,
-                                b.end,
-                                b.strand,
-                                a.chrom,
-                                a.start,
-                                a.end,
-                                a.strand,
-                                alignment_vec.len() - 1
-                            );
-                        }else{
-                            bed_line = format!(
                                 "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
                                 b.chrom,
                                 b.start,
@@ -262,23 +275,22 @@ fn main() {
                                 &strand,
                                 record.flags()
                             );
+                        } else {
+                            bed_line = format!(
+                                "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+                                b.chrom,
+                                b.start,
+                                b.end,
+                                b.strand,
+                                a.chrom,
+                                a.start,
+                                a.end,
+                                a.strand,
+                                alignment_vec.len() - 1
+                            );
                         }
-
                     } else {
-                        if cli.debug{
-                            bed_line = format!(
-                                "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
-                                a.chrom,
-                                a.start,
-                                a.end,
-                                a.strand,
-                                b.chrom,
-                                b.start,
-                                b.end,
-                                b.strand,
-                                alignment_vec.len() - 1
-                            );
-                        }else{
+                        if cli.debug {
                             bed_line = format!(
                                 "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
                                 a.chrom,
@@ -295,8 +307,20 @@ fn main() {
                                 &strand,
                                 record.flags()
                             );
+                        } else {
+                            bed_line = format!(
+                                "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+                                a.chrom,
+                                a.start,
+                                a.end,
+                                a.strand,
+                                b.chrom,
+                                b.start,
+                                b.end,
+                                b.strand,
+                                alignment_vec.len() - 1
+                            );
                         }
-
                     }
                     f.write(bed_line.as_bytes()).unwrap();
                 }
@@ -337,7 +361,6 @@ fn main() {
                 match x {
                     &Cigar::Del(n) => {
                         right_consume -= n;
-
                         if n > cli.indel_min {
                             // report one event
 
@@ -350,6 +373,7 @@ fn main() {
                                 &strand,
                             );
                             alignments_event_vec.push(aligments_event);
+
                             // dbg!(
                             //     "xxx".to_string(),
                             //     &record.pos(),
@@ -380,33 +404,75 @@ fn main() {
             }
 
             // do merge step
-            let mut merged_alignments_event_vec:Vec<AlignmentEvent> = vec![];
-            for idx in 1..alignments_event_vec.len(){
-                let pidx = idx -1;
-                let a = alignments_event_vec[pidx].clone();
-                let b = alignments_event_vec[idx].clone();
-                // dbg!(&cigar,&a,&b, b.lend.abs_diff(a.rstart));
-                if  b.lend.abs_diff(a.rstart) < cli.merge_min  {
-                    let c = AlignmentEvent {
-                        lchrom:a.lchrom,
-                        lstart:a.lstart,
-                        lend:a.lend,
-                        lstrand:a.lstrand,
-                        rchrom:b.rchrom,
-                        rstart:b.rstart,
-                        rend:b.rend,
-                        rstrand:b.rstrand,
-                        events_num:1
-                    };
-                    merged_alignments_event_vec.push(c);
-                }else{
-                    merged_alignments_event_vec.push(a);
-                    merged_alignments_event_vec.push(b);
+            let mut merged_alignments_event_vec: Vec<AlignmentEvent> = vec![];
+
+            if alignments_event_vec.len() > 1 {
+                for idx in 1..alignments_event_vec.len() {
+                    let pidx = idx - 1;
+                    let a = alignments_event_vec[pidx].clone();
+                    let b = alignments_event_vec[idx].clone();
+                    // dbg!(&cigar,&a,&b, b.lend.abs_diff(a.rstart));
+                    if b.lend.abs_diff(a.rstart) < cli.merge_min {
+                        let c = AlignmentEvent {
+                            lchrom: a.lchrom,
+                            lstart: a.lstart,
+                            lend: a.lend,
+                            lstrand: a.lstrand,
+                            rchrom: b.rchrom,
+                            rstart: b.rstart,
+                            rend: b.rend,
+                            rstrand: b.rstrand,
+                            events_num: 1,
+                        };
+                        merged_alignments_event_vec.push(c);
+                    } else {
+                        merged_alignments_event_vec.push(a);
+                        merged_alignments_event_vec.push(b);
+                    }
                 }
+            } else if alignments_event_vec.len() == 1 {
+                let a: AlignmentEvent = alignments_event_vec[0usize].clone();
+                merged_alignments_event_vec.push(a);
             }
+            // dbg!(
+            //     std::str::from_utf8(record.qname()),
+            //     &alignments_event_vec,
+            //     &merged_alignments_event_vec
+            // );
             // print all record
-            merged_alignments_event_vec.into_iter().for_each(|x|{
-                f.write(x.get_bed_record().as_bytes()).unwrap();
+            merged_alignments_event_vec.into_iter().for_each(|x| {
+                let mut rrr: String;
+                if cli.debug {
+                    rrr = format!(
+                        "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+                        x.lchrom,
+                        x.lstart,
+                        x.lend,
+                        x.lstrand,
+                        x.rchrom,
+                        x.rstart,
+                        x.rend,
+                        x.rstrand,
+                        x.events_num,
+                        "excord-lr-alignment-event",
+                        std::str::from_utf8(record.qname()).unwrap()
+                    );
+                } else {
+                    rrr = format!(
+                        "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+                        x.lchrom,
+                        x.lstart,
+                        x.lend,
+                        x.lstrand,
+                        x.rchrom,
+                        x.rstart,
+                        x.rend,
+                        x.rstrand,
+                        x.events_num
+                    );
+                }
+
+                f.write(rrr.as_bytes()).unwrap();
             });
         }
     }
