@@ -67,6 +67,10 @@ struct Cli {
     /// Only report split-read event
     #[arg(short, long, default_value_t = false)]
     split_only: bool,
+
+    /// Only report split-read event
+    #[arg(short, long, default_value_t = false)]
+    debug: bool,
 }
 
 fn main() {
@@ -228,39 +232,71 @@ fn main() {
                     let bed_line: String;
                     // dbg!(&a);
                     if alignment_pos_cmp(a, b) == Ordering::Greater {
-                        bed_line = format!(
-                            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
-                            b.chrom,
-                            b.start,
-                            b.end,
-                            b.strand,
-                            a.chrom,
-                            a.start,
-                            a.end,
-                            a.strand,
-                            alignment_vec.len() - 1,
-                            "excord-lr-split-read",
-                            std::str::from_utf8(record.qname()).unwrap(),
-                            &strand,
-                            record.flags()
-                        );
+                        if cli.debug {
+                            bed_line = format!(
+                                "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+                                b.chrom,
+                                b.start,
+                                b.end,
+                                b.strand,
+                                a.chrom,
+                                a.start,
+                                a.end,
+                                a.strand,
+                                alignment_vec.len() - 1
+                            );
+                        }else{
+                            bed_line = format!(
+                                "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+                                b.chrom,
+                                b.start,
+                                b.end,
+                                b.strand,
+                                a.chrom,
+                                a.start,
+                                a.end,
+                                a.strand,
+                                alignment_vec.len() - 1,
+                                "excord-lr-split-read",
+                                std::str::from_utf8(record.qname()).unwrap(),
+                                &strand,
+                                record.flags()
+                            );
+                        }
+
                     } else {
-                        bed_line = format!(
-                            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
-                            a.chrom,
-                            a.start,
-                            a.end,
-                            a.strand,
-                            b.chrom,
-                            b.start,
-                            b.end,
-                            b.strand,
-                            alignment_vec.len() - 1,
-                            "excord-lr-split-read",
-                            std::str::from_utf8(record.qname()).unwrap(),
-                            &strand,
-                            record.flags()
-                        );
+                        if cli.debug{
+                            bed_line = format!(
+                                "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+                                a.chrom,
+                                a.start,
+                                a.end,
+                                a.strand,
+                                b.chrom,
+                                b.start,
+                                b.end,
+                                b.strand,
+                                alignment_vec.len() - 1
+                            );
+                        }else{
+                            bed_line = format!(
+                                "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+                                a.chrom,
+                                a.start,
+                                a.end,
+                                a.strand,
+                                b.chrom,
+                                b.start,
+                                b.end,
+                                b.strand,
+                                alignment_vec.len() - 1,
+                                "excord-lr-split-read",
+                                std::str::from_utf8(record.qname()).unwrap(),
+                                &strand,
+                                record.flags()
+                            );
+                        }
+
                     }
                     f.write(bed_line.as_bytes()).unwrap();
                 }
