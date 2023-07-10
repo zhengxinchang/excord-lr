@@ -3,6 +3,9 @@ build:
 	CC=/usr/bin/musl-gcc  cargo build --release --target=x86_64-unknown-linux-musl
 #cross build --target x86_64-unknown-linux-musl
 
+push:
+	rsync -avz target/x86_64-unknown-linux-musl/release/excord-lr   u249633@sug-login4.hgsc.bcm.edu:/stornext/snfs5/next-gen/scratch/zhengxc/workspace/stix/test_hg002/excord-lr
+
 h:build
 	target/x86_64-unknown-linux-musl/release/excord-lr --help
 
@@ -45,3 +48,6 @@ t2f:
 	target/x86_64-unknown-linux-musl/release/excord-lr   \
 	-b test/full_aln.sort.bam \
 	-o test/tt 
+
+t3:build
+	time target/x86_64-unknown-linux-musl/release/excord-lr -d -Q 1 -b test/visibleData.bam -o test/t3 

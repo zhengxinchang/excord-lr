@@ -41,19 +41,4 @@ impl AlignmentEvent {
             events_num: 1i32,
         }
     }
-    pub fn get_bed_record(self) -> String {
-        format!(
-            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
-            self.lchrom,
-            self.lstart,
-            self.lend,
-            self.lstrand,
-            self.rchrom,
-            self.rstart,
-            self.rend,
-            self.rstrand,
-            self.events_num,
-            "excord-lr-alignment-event"
-        )
-    }
 }

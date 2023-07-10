@@ -84,7 +84,7 @@ struct Cli {
 fn main() {
     let cli = Cli::parse();
     if cli.debug {
-        println!(&cli);
+        println!("{:?}",&cli);
     }
     
     let _bam = cli.bam;
@@ -441,7 +441,7 @@ fn main() {
             // );
             // print all record
             merged_alignments_event_vec.into_iter().for_each(|x| {
-                let mut rrr: String;
+                let rrr: String;
                 if cli.debug {
                     rrr = format!(
                         "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
