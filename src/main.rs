@@ -84,9 +84,9 @@ struct Cli {
 fn main() {
     let cli = Cli::parse();
     if cli.debug {
-        println!("{:?}",&cli);
+        println!("{:?}", &cli);
     }
-    
+
     let _bam = cli.bam;
     if !_bam.is_file() {
         println!("Ivalid BAM file path: {} ", _bam.to_str().unwrap());

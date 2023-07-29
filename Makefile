@@ -51,3 +51,6 @@ t2f:
 
 t3:build
 	time target/x86_64-unknown-linux-musl/release/excord-lr -d -Q 1 -b test/visibleData.bam -o test/t3 
+
+t4:build
+	time target/x86_64-unknown-linux-musl/release/excord-lr -d -Q 1 -b test/1.1865639.bam -o test/t4 
