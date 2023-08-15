@@ -26,7 +26,7 @@ use aligments_event::*;
 #[derive(Parser, Debug)]
 #[command(name = "excord-LR")]
 #[command(author = "Xinchang Zheng <zhengxc93@gmail.com>")]
-#[command(version = "0.1.3")]
+#[command(version = "0.1.4")]
 #[command(about = "
 Extract Structural Variation Signals from Long-Read BAMs
 Contact: Xinchang Zheng <zhengxc93@gmail.com,Xinchang.Zheng@bcm.edu>
@@ -75,6 +75,10 @@ struct Cli {
     /// Only report split-read event
     #[arg(short, long, default_value_t = false)]
     split_only: bool,
+
+    /// percent of overlap to discard a potential false positive record(set 0 to disable)
+    #[arg(short,long, default_value_t = 0.8)]
+    pct_overlap: f64,
 
     /// debug
     #[arg(short, long, default_value_t = false)]
@@ -250,7 +254,49 @@ fn main() {
                 }
                 // dbg!(&std::str::from_utf8(record.qname()),&alignment_vec);
                 alignment_vec.sort_by(|a, b| splitter_order_cmp(a, b));
-                // dbg!(&std::str::from_utf8(record.qname()),&alignment_vec);
+                
+
+                // iterally remove the potential FP that caused by the secondary alignment which is very close to
+                // the primary alignment. 
+                // e.g.,  primary alignment reported region 1	2367366	2368042; the secondary alignment is 1	2367371	2368042
+                // this will introduce a false positive
+                // 
+                // In order to remove it. next step I will compare each adjacent alignment pairs. if the overlap of the region
+                // is very long. one of them will be removed.
+                
+                if cli.pct_overlap > 0.0 {
+                    let mut curr_len = alignment_vec.len();
+
+                    loop{
+                        for i in 1..alignment_vec.len() {
+                            let j = i - 1;
+                            let a: &SplitReadEvent = &alignment_vec[j];
+                            let b: &SplitReadEvent = &alignment_vec[i];
+                            if a.chrom != b.chrom{
+                                continue;
+                            }
+                            else{
+                                dbg!(&a,&b);
+                                // determine whether to remove one alignment
+                                if ! overlap(&a.start,&a.end,&b.start,&b.end,0.8f64) {
+                                    alignment_vec.remove(j);
+                                    
+                                    break;
+                                }
+                                
+                            }
+                        }
+                        if curr_len == alignment_vec.len(){
+                            break;
+                        }else{
+                            curr_len = alignment_vec.len();
+                        }
+                    }
+    
+                }
+
+
+
                 for i in 1..alignment_vec.len() {
                     let j = i - 1;
                     let a: &SplitReadEvent = &alignment_vec[j];
@@ -328,6 +374,8 @@ fn main() {
             Err(_) => {}
         };
         alignment_vec.clear();
+
+        // Extract Alignment event if split_only option is disabled.
         if cli.split_only == false {
             // parse the CIGAR value for each record
             let cigar = record.cigar();
@@ -363,7 +411,6 @@ fn main() {
                         right_consume -= n;
                         if n > cli.indel_min {
                             // report one event
-
                             let aligments_event = AlignmentEvent::new(
                                 &contig_name,
                                 &left_consume,
@@ -387,6 +434,21 @@ fn main() {
                         }
                         left_consume += n;
                     }
+                    &Cigar::Ins(n) => {
+                        if n > cli.indel_min {
+                            let aligments_event = AlignmentEvent::new(
+                                &contig_name,
+                                &left_consume,
+                                &right_consume,
+                                &(0u32),
+                                &pos,
+                                &strand,
+                            );
+                            // dbg!("insertion",&aligments_event);
+                            alignments_event_vec.push(aligments_event);
+                            
+                        }
+                    }
                     &Cigar::Match(n) => {
                         left_consume += n;
                         right_consume -= n;
@@ -405,11 +467,10 @@ fn main() {
 
             // do merge step
             let mut merged_alignments_event_vec: Vec<AlignmentEvent> = vec![];
-            
 
-            if cli.debug {
-                dbg!(&merged_alignments_event_vec);
-            }
+            // if cli.debug {
+            //     dbg!(&merged_alignments_event_vec);
+            // }
 
             if alignments_event_vec.len() > 1 {
                 let mut merge1: Vec<AlignmentEvent> = alignments_event_vec.clone();

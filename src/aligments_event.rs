@@ -20,7 +20,7 @@ impl AlignmentEvent {
         right_consume: &u32,
         event_len: &u32,
         pos: &i64,
-        strand: &i32,
+        strand: &i32
     ) -> AlignmentEvent {
         let chrom_clean: String;
         if chrom.starts_with(&"chr".to_string()) {

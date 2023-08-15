@@ -26,12 +26,11 @@ pub fn find_first_match_pos(cigar_str: &str) -> i64 {
             if c == 'M' {
                 break;
             } else {
-
                 // Must used the Query consume according to CIGAR type
                 // S I X = will consume Query
-                if  c == 'S' || c == 'I' || c =='X' || c== '='{
+                if c == 'S' || c == 'I' || c == 'X' || c == '=' {
                     p += p_string.parse::<i64>().unwrap();
-                } 
+                }
                 p_string = "".to_string();
             }
         }
@@ -45,7 +44,7 @@ pub fn find_first_match_pos(cigar_str: &str) -> i64 {
 /// From brentp:
 ///
 /// ```
-/// 
+///
 /// output splitters. Splitters are ordered by their offset into the read.
 /// given, cigars of:
 /// A:20S30M100S
@@ -61,16 +60,14 @@ pub fn splitter_order_cmp(a: &SplitReadEvent, b: &SplitReadEvent) -> Ordering {
     // dbg!(a_first_match_pos,b_first_match_pos,a_first_match_pos.cmp(&b_first_match_pos));
     if a_first_match_pos < b_first_match_pos {
         Ordering::Less
-    }else{
-        if a_first_match_pos > b_first_match_pos{
+    } else {
+        if a_first_match_pos > b_first_match_pos {
             Ordering::Greater
-        }else{
+        } else {
             Ordering::Equal
         }
-        
     }
     // a_first_match_pos.cmp(&b_first_match_pos)
-    
 }
 
 pub fn alignment_pos_cmp(a: &SplitReadEvent, b: &SplitReadEvent) -> Ordering {
@@ -148,4 +145,35 @@ pub fn absolute_path(path: impl AsRef<Path>) -> io::Result<PathBuf> {
     };
 
     Ok(absolute_path)
+}
+
+pub fn overlap(a_start: &i64, a_end: &i64, b_start: &i64, b_end: &i64, over_pct: f64) -> bool {
+    if a_end < b_start || a_start > b_end {
+        return false;
+    } else {
+        if a_start < b_start {
+            // a is head of b
+            // a-------------a
+            //    b---------------b
+            let ov =
+                (a_end - b_start) as f64 / ((a_end - a_start) + (b_end - b_start)) as f64 / 2.0f64;
+            if ov > over_pct {
+                return true;
+            } else {
+                return false;
+            }
+        } else {
+            // b is head of a
+            //    a-----------------a
+            // b---------------b
+
+            let ov =
+                (b_end - a_start) as f64 / ((a_end - a_start) + (b_end - b_start)) as f64 / 2.0f64;
+            if ov > over_pct {
+                return true;
+            } else {
+                return false;
+            }
+        }
+    }
 }
