@@ -26,7 +26,7 @@ use aligments_event::*;
 #[derive(Parser, Debug)]
 #[command(name = "excord-LR")]
 #[command(author = "Xinchang Zheng <zhengxc93@gmail.com>")]
-#[command(version = "0.1.2")]
+#[command(version = "0.1.3")]
 #[command(about = "
 Extract Structural Variation Signals from Long-Read BAMs
 Contact: Xinchang Zheng <zhengxc93@gmail.com,Xinchang.Zheng@bcm.edu>
@@ -405,41 +405,53 @@ fn main() {
 
             // do merge step
             let mut merged_alignments_event_vec: Vec<AlignmentEvent> = vec![];
+            
+
+            if cli.debug {
+                dbg!(&merged_alignments_event_vec);
+            }
 
             if alignments_event_vec.len() > 1 {
-                for idx in 1..alignments_event_vec.len() {
-                    let pidx = idx - 1;
-                    let a = alignments_event_vec[pidx].clone();
-                    let b = alignments_event_vec[idx].clone();
-                    // dbg!(&cigar,&a,&b, b.lend.abs_diff(a.rstart));
-                    if b.lend.abs_diff(a.rstart) < cli.merge_min {
-                        let c = AlignmentEvent {
-                            lchrom: a.lchrom,
-                            lstart: a.lstart,
-                            lend: a.lend,
-                            lstrand: a.lstrand,
-                            rchrom: b.rchrom,
-                            rstart: b.rstart,
-                            rend: b.rend,
-                            rstrand: b.rstrand,
-                            events_num: 1,
-                        };
-                        merged_alignments_event_vec.push(c);
+                let mut merge1: Vec<AlignmentEvent> = alignments_event_vec.clone();
+                let mut merge2: Vec<AlignmentEvent> = vec![];
+                let mut iter_times = 5u32;
+                loop {
+                    iter_times -= 1;
+                    for idx in 1..merge1.len() {
+                        let pidx = idx - 1;
+                        let a: AlignmentEvent = merge1[pidx].clone();
+                        let b: AlignmentEvent = merge1[idx].clone();
+                        // dbg!(&cigar,&a,&b, b.lend.abs_diff(a.rstart));
+                        if b.lend.abs_diff(a.rstart) < cli.merge_min {
+                            let c: AlignmentEvent = AlignmentEvent {
+                                lchrom: a.lchrom,
+                                lstart: a.lstart,
+                                lend: a.lend,
+                                lstrand: a.lstrand,
+                                rchrom: b.rchrom,
+                                rstart: b.rstart,
+                                rend: b.rend,
+                                rstrand: b.rstrand,
+                                events_num: 1,
+                            };
+                            merge2.push(c);
+                        } else {
+                            merge2.push(a);
+                            merge2.push(b);
+                        }
+                    }
+                    if merge1.len() == merge2.len() {
+                        break;
+                    } else if iter_times <= 0 {
+                        break;
                     } else {
-                        merged_alignments_event_vec.push(a);
-                        merged_alignments_event_vec.push(b);
+                        merge1 = merge2.clone();
                     }
                 }
             } else if alignments_event_vec.len() == 1 {
                 let a: AlignmentEvent = alignments_event_vec[0usize].clone();
                 merged_alignments_event_vec.push(a);
             }
-            // dbg!(
-            //     std::str::from_utf8(record.qname()),
-            //     &alignments_event_vec,
-            //     &merged_alignments_event_vec
-            // );
-            // print all record
             merged_alignments_event_vec.into_iter().for_each(|x| {
                 let rrr: String;
                 if cli.debug {
