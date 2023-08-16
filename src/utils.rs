@@ -148,6 +148,7 @@ pub fn absolute_path(path: impl AsRef<Path>) -> io::Result<PathBuf> {
 }
 
 pub fn overlap(a_start: &i64, a_end: &i64, b_start: &i64, b_end: &i64, over_pct: f64) -> bool {
+    // dbg!(&a_start,&a_end,&b_start,&b_end);
     if a_end < b_start || a_start > b_end {
         return false;
     } else {
@@ -156,7 +157,8 @@ pub fn overlap(a_start: &i64, a_end: &i64, b_start: &i64, b_end: &i64, over_pct:
             // a-------------a
             //    b---------------b
             let ov =
-                (a_end - b_start) as f64 / ((a_end - a_start) + (b_end - b_start)) as f64 / 2.0f64;
+                (a_end - b_start) as f64 / ((a_end - a_start) + (b_end - b_start)) as f64 * 2.0f64;
+                // dbg!("a_start < b_start",&ov);
             if ov > over_pct {
                 return true;
             } else {
@@ -168,7 +170,8 @@ pub fn overlap(a_start: &i64, a_end: &i64, b_start: &i64, b_end: &i64, over_pct:
             // b---------------b
 
             let ov =
-                (b_end - a_start) as f64 / ((a_end - a_start) + (b_end - b_start)) as f64 / 2.0f64;
+                (b_end - a_start) as f64 / ((a_end - a_start) + (b_end - b_start)) as f64 * 2.0f64;
+                // dbg!("a_start > b_start",&ov);
             if ov > over_pct {
                 return true;
             } else {

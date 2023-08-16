@@ -26,7 +26,7 @@ use aligments_event::*;
 #[derive(Parser, Debug)]
 #[command(name = "excord-LR")]
 #[command(author = "Xinchang Zheng <zhengxc93@gmail.com>")]
-#[command(version = "0.1.4")]
+#[command(version = "0.1.6")]
 #[command(about = "
 Extract Structural Variation Signals from Long-Read BAMs
 Contact: Xinchang Zheng <zhengxc93@gmail.com,Xinchang.Zheng@bcm.edu>
@@ -83,6 +83,10 @@ struct Cli {
     /// debug
     #[arg(short, long, default_value_t = false)]
     debug: bool,
+
+    /// debug
+    #[arg(short, long, default_value_t = false)]
+    verbose: bool,
 }
 
 fn main() {
@@ -276,9 +280,9 @@ fn main() {
                                 continue;
                             }
                             else{
-                                dbg!(&a,&b);
+                                // dbg!(&a,&b);
                                 // determine whether to remove one alignment
-                                if ! overlap(&a.start,&a.end,&b.start,&b.end,0.8f64) {
+                                if overlap(&a.start,&a.end,&b.start,&b.end,0.8f64) {
                                     alignment_vec.remove(j);
                                     
                                     break;
@@ -304,7 +308,7 @@ fn main() {
                     let bed_line: String;
                     // dbg!(&a);
                     if alignment_pos_cmp(a, b) == Ordering::Greater {
-                        if cli.debug {
+                        if cli.verbose {
                             bed_line = format!(
                                 "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
                                 b.chrom,
@@ -336,7 +340,7 @@ fn main() {
                             );
                         }
                     } else {
-                        if cli.debug {
+                        if cli.verbose {
                             bed_line = format!(
                                 "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
                                 a.chrom,
@@ -515,7 +519,7 @@ fn main() {
             }
             merged_alignments_event_vec.into_iter().for_each(|x| {
                 let rrr: String;
-                if cli.debug {
+                if cli.verbose {
                     rrr = format!(
                         "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
                         x.lchrom,
