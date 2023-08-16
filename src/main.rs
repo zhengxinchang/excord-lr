@@ -250,6 +250,9 @@ fn main() {
                 /* process the supplementary alignments */
                 if let Aux::String(sa) = _sa {
                     let sa_list = sa.split(";").collect::<Vec<&str>>();
+
+                    if sa_list.len() > 5usize {break;}
+
                     let sa_list_clean = sa_list.iter().filter(|x| x.len() > 0);
                     // dbg!(&sa_list_clean);
                     for single_sa in sa_list_clean {
