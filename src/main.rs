@@ -14,6 +14,7 @@ use std::{
     collections::HashMap,
     fs::File,
     io::{BufWriter, Write},
+    ops::BitAnd,
     path::PathBuf,
     process::exit,
 };
@@ -41,7 +42,7 @@ struct Cli {
     mapq: u8,
 
     /// Exclude Flags
-    #[arg(short = 'F', long, default_value_t = 1540)]
+    #[arg(short = 'F', long, default_value_t = 1796)]
     exclude_flag: u16,
 
     /// Exclude Secondary Alignment
@@ -77,14 +78,18 @@ struct Cli {
     split_only: bool,
 
     /// percent of overlap to discard a potential false positive record(set 0 to disable)
-    #[arg(short,long, default_value_t = 0.8)]
+    #[arg(short, long, default_value_t = 0.8)]
     pct_overlap: f64,
+
+    /// maximal number of SA to include a record
+    #[arg(short = 'k', long, default_value_t = 4)]
+    max_supp_alignm: usize,
 
     /// debug
     #[arg(short, long, default_value_t = false)]
     debug: bool,
 
-    /// debug
+    /// verbose output.
     #[arg(short, long, default_value_t = false)]
     verbose: bool,
 }
@@ -139,10 +144,10 @@ fn main() {
             continue;
         }
 
-        if (record.flags() & cli.exclude_flag) != 0
+        // dbg!(272u16.bitand(256u16));
+        if record.flags().bitand(cli.exclude_flag) != 0u16
         // == 0 means not match with flag.
         {
-            // dbg!("found wrong flag", record.qname());
             continue;
         }
 
@@ -251,7 +256,9 @@ fn main() {
                 if let Aux::String(sa) = _sa {
                     let sa_list = sa.split(";").collect::<Vec<&str>>();
 
-                    if sa_list.len() > 5usize {break;}
+                    if sa_list.len() > cli.max_supp_alignm {
+                        break;
+                    }
 
                     let sa_list_clean = sa_list.iter().filter(|x| x.len() > 0);
                     // dbg!(&sa_list_clean);
@@ -261,48 +268,42 @@ fn main() {
                 }
                 // dbg!(&std::str::from_utf8(record.qname()),&alignment_vec);
                 alignment_vec.sort_by(|a, b| splitter_order_cmp(a, b));
-                
 
                 // iterally remove the potential FP that caused by the secondary alignment which is very close to
-                // the primary alignment. 
+                // the primary alignment.
                 // e.g.,  primary alignment reported region 1	2367366	2368042; the secondary alignment is 1	2367371	2368042
                 // this will introduce a false positive
-                // 
+                //
                 // In order to remove it. next step I will compare each adjacent alignment pairs. if the overlap of the region
                 // is very long. one of them will be removed.
-                
+
                 if cli.pct_overlap > 0.0 {
                     let mut curr_len = alignment_vec.len();
 
-                    loop{
+                    loop {
                         for i in 1..alignment_vec.len() {
                             let j = i - 1;
                             let a: &SplitReadEvent = &alignment_vec[j];
                             let b: &SplitReadEvent = &alignment_vec[i];
-                            if a.chrom != b.chrom{
+                            if a.chrom != b.chrom {
                                 continue;
-                            }
-                            else{
+                            } else {
                                 // dbg!(&a,&b);
                                 // determine whether to remove one alignment
-                                if overlap(&a.start,&a.end,&b.start,&b.end,0.8f64) {
+                                if overlap(&a.start, &a.end, &b.start, &b.end, 0.8f64) {
                                     alignment_vec.remove(j);
-                                    
+
                                     break;
                                 }
-                                
                             }
                         }
-                        if curr_len == alignment_vec.len(){
+                        if curr_len == alignment_vec.len() {
                             break;
-                        }else{
+                        } else {
                             curr_len = alignment_vec.len();
                         }
                     }
-    
                 }
-
-
 
                 for i in 1..alignment_vec.len() {
                     let j = i - 1;
@@ -313,7 +314,7 @@ fn main() {
                     if alignment_pos_cmp(a, b) == Ordering::Greater {
                         if cli.verbose {
                             bed_line = format!(
-                                "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+                                "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\tstrand:{}\tflag:{}\n",
                                 b.chrom,
                                 b.start,
                                 b.end,
@@ -345,7 +346,7 @@ fn main() {
                     } else {
                         if cli.verbose {
                             bed_line = format!(
-                                "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+                                "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\tstrand:{}\tflag:{}\n",
                                 a.chrom,
                                 a.start,
                                 a.end,
@@ -453,7 +454,6 @@ fn main() {
                             );
                             // dbg!("insertion",&aligments_event);
                             alignments_event_vec.push(aligments_event);
-                            
                         }
                     }
                     &Cigar::Match(n) => {
@@ -524,7 +524,7 @@ fn main() {
                 let rrr: String;
                 if cli.verbose {
                     rrr = format!(
-                        "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+                        "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\tstrand:{}\tflag:{}\n",
                         x.lchrom,
                         x.lstart,
                         x.lend,
