@@ -27,7 +27,7 @@ use aligments_event::*;
 #[derive(Parser, Debug)]
 #[command(name = "excord-LR")]
 #[command(author = "Xinchang Zheng <zhengxc93@gmail.com>")]
-#[command(version = "0.1.6")]
+#[command(version = "0.1.7")]
 #[command(about = "
 Extract Structural Variation Signals from Long-Read BAMs
 Contact: Xinchang Zheng <zhengxc93@gmail.com,Xinchang.Zheng@bcm.edu>
@@ -77,9 +77,9 @@ struct Cli {
     #[arg(short, long, default_value_t = false)]
     split_only: bool,
 
-    /// Percent of overlap to discard a potential false positive record
-    #[arg(short='p', long, default_value_t = 0.8)]
-    max_pct_overlap: f64,
+    /// Percent of overlap to discard a potential false positive record[Optional]
+    #[arg(short='p', long)]
+    max_pct_overlap: Option<f64> ,
 
     /// Maximal number of SA to include a record
     #[arg(short = 'k', long, default_value_t = 4)]
@@ -277,7 +277,7 @@ fn main() {
                 //
 
 
-                if cli.max_pct_overlap >= 0.0 {
+                if cli.max_pct_overlap != None {
                     let mut curr_len = alignment_vec.len();
                     // dbg!("asdf");
                     loop {
@@ -290,7 +290,7 @@ fn main() {
                             } else {
                                 // dbg!(&a,&b);
                                 // determine whether to remove one alignment
-                                if overlap(&a.start, &a.end, &b.start, &b.end, cli.max_pct_overlap) {
+                                if overlap(&a.start, &a.end, &b.start, &b.end, cli.max_pct_overlap.unwrap()) {
                                     alignment_vec.remove(j);
                                     break;
                                 }
