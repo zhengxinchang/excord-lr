@@ -62,3 +62,6 @@ treadname:build
 
 treadname2:build
 	time target/x86_64-unknown-linux-musl/release/excord-lr --verbose -p 0 -b test/c27f2be4-a026-47a6-af4c-46d2e91c1b1b.new.bam -o test/c27f2be4-a026-47a6-af4c-46d2e91c1b1b.new 
+
+cp:build
+	scp -r -oHostKeyAlgorithms=+ssh-rsa target/x86_64-unknown-linux-musl/release/excord-lr    zhengxc@10.51.131.125:/workspace/zhengxc/project/stix/test/

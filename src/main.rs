@@ -27,7 +27,7 @@ use aligments_event::*;
 #[derive(Parser, Debug)]
 #[command(name = "excord-LR")]
 #[command(author = "Xinchang Zheng <zhengxc93@gmail.com>")]
-#[command(version = "0.1.7")]
+#[command(version = "0.1.8")]
 #[command(about = "
 Extract Structural Variation Signals from Long-Read BAMs
 Contact: Xinchang Zheng <zhengxc93@gmail.com,Xinchang.Zheng@bcm.edu>
@@ -425,6 +425,7 @@ fn main() {
                                 &n,
                                 &pos,
                                 &strand,
+                                Some(AlignEventType::Del)
                             );
                             alignments_event_vec.push(aligments_event);
 
@@ -450,6 +451,7 @@ fn main() {
                                 &(0u32),
                                 &pos,
                                 &strand,
+                                Some(AlignEventType::Ins)
                             );
                             // dbg!("insertion",&aligments_event);
                             alignments_event_vec.push(aligments_event);
@@ -489,7 +491,7 @@ fn main() {
                         let a: AlignmentEvent = merge1[pidx].clone();
                         let b: AlignmentEvent = merge1[idx].clone();
                         // dbg!(&cigar,&a,&b, b.lend.abs_diff(a.rstart));
-                        if b.lend.abs_diff(a.rstart) < cli.merge_min {
+                        if b.lend.abs_diff(a.rstart) < cli.merge_min && (a.svtype == AlignEventType::Del && b.svtype == AlignEventType::Del) {
                             let c: AlignmentEvent = AlignmentEvent {
                                 lchrom: a.lchrom,
                                 lstart: a.lstart,
@@ -500,6 +502,7 @@ fn main() {
                                 rend: b.rend,
                                 rstrand: b.rstrand,
                                 events_num: 1,
+                                svtype:AlignEventType::Del
                             };
                             merge2.push(c);
                         } else {
