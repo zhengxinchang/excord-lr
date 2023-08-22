@@ -147,36 +147,47 @@ pub fn absolute_path(path: impl AsRef<Path>) -> io::Result<PathBuf> {
     Ok(absolute_path)
 }
 
-pub fn overlap(a_start: &i64, a_end: &i64, b_start: &i64, b_end: &i64, over_pct: f64) -> bool {
+/// # calucate the overlap between the left interval and the right interval.
+/// 
+/// max_over_pct represents the max percent of overlap threshold. Any bed 
+/// record which overlap of left and right intervals more than 
+/// `max_over_pct * min(interval_a, interval_b)` will not be reported.
+/// 
+pub fn overlap(a_start: &i64, a_end: &i64, b_start: &i64, b_end: &i64, max_over_pct: f64) -> bool {
     // dbg!(&a_start,&a_end,&b_start,&b_end);
     if a_end < b_start || a_start > b_end {
         return false;
     } else {
+        let min_len = (a_end - a_start).min(b_end - b_start);
+        let ov: f64;
         if a_start < b_start {
             // a is head of b
-            // a-------------a
-            //    b---------------b
-            let ov =
-                (a_end - b_start) as f64 / ((a_end - a_start) + (b_end - b_start)) as f64 * 2.0f64;
-                // dbg!("a_start < b_start",&ov);
-            if ov > over_pct {
-                return true;
+
+            if a_end < b_end {
+                // a-------------a
+                //    b---------------b
+                ov = (a_end - b_start) as f64 / min_len as f64;
             } else {
-                return false;
+                // a---------------------------a
+                //    b---------------b
+                ov = (b_end - b_start) as f64 / min_len as f64;
             }
         } else {
             // b is head of a
-            //    a-----------------a
-            // b---------------b
-
-            let ov =
-                (b_end - a_start) as f64 / ((a_end - a_start) + (b_end - b_start)) as f64 * 2.0f64;
-                // dbg!("a_start > b_start",&ov);
-            if ov > over_pct {
-                return true;
+            if b_end < a_end {
+                //    a-----------------a
+                // b---------------b
+                ov = (b_end - a_start) as f64 / min_len as f64;
             } else {
-                return false;
+
+                ov = (a_end - a_start) as f64 / min_len as f64;
             }
+        }
+
+        if ov > max_over_pct {
+            return true;
+        } else {
+            return false;
         }
     }
 }

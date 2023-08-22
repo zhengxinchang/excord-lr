@@ -53,8 +53,12 @@ t3:build
 	time target/x86_64-unknown-linux-musl/release/excord-lr -d -Q 1 -b test/visibleData.bam -o test/t3 
 
 t4:build
-	time target/x86_64-unknown-linux-musl/release/excord-lr -d -Q 1 -b test/1.1865639.bam -o test/t4 
+	time target/x86_64-unknown-linux-musl/release/excord-lr --verbose -Q 1 -b test/1.1865639.bam -o test/t4 
 
 
 treadname:build
-	time target/x86_64-unknown-linux-musl/release/excord-lr -d  -b test/c27f2be4-a026-47a6-af4c-46d2e91c1b1b.new.bam -o test/c27f2be4-a026-47a6-af4c-46d2e91c1b1b.new 
+	time target/x86_64-unknown-linux-musl/release/excord-lr --verbose  -b test/c27f2be4-a026-47a6-af4c-46d2e91c1b1b.new.bam -o test/c27f2be4-a026-47a6-af4c-46d2e91c1b1b.new 
+
+
+treadname2:build
+	time target/x86_64-unknown-linux-musl/release/excord-lr --verbose -p 0 -b test/c27f2be4-a026-47a6-af4c-46d2e91c1b1b.new.bam -o test/c27f2be4-a026-47a6-af4c-46d2e91c1b1b.new 

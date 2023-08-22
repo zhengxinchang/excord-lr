@@ -57,7 +57,7 @@ struct Cli {
     #[arg(short, long, default_value_t = 8)]
     thread: usize,
 
-    /// Minimal len to define an SV events in CIGAR
+    /// Minimal length to define an SV events in CIGAR
     #[arg(short, long, default_value_t = 50)]
     indel_min: u32,
 
@@ -77,19 +77,19 @@ struct Cli {
     #[arg(short, long, default_value_t = false)]
     split_only: bool,
 
-    /// percent of overlap to discard a potential false positive record(set 0 to disable)
-    #[arg(short, long, default_value_t = 0.8)]
-    pct_overlap: f64,
+    /// Percent of overlap to discard a potential false positive record
+    #[arg(short='p', long, default_value_t = 0.8)]
+    max_pct_overlap: f64,
 
-    /// maximal number of SA to include a record
+    /// Maximal number of SA to include a record
     #[arg(short = 'k', long, default_value_t = 4)]
     max_supp_alignm: usize,
 
-    /// debug
+    /// Debug
     #[arg(short, long, default_value_t = false)]
     debug: bool,
 
-    /// verbose output.
+    /// Verbose output
     #[arg(short, long, default_value_t = false)]
     verbose: bool,
 }
@@ -192,8 +192,6 @@ fn main() {
                             |--------Type of this Enum
                 */
                 let mut first_cigar_str = "".to_string();
-                // dbg!(&record.cigar());
-                // dbg!("xxxxxxxxxxxxxxxx".to_string());
                 record.cigar().iter().for_each(|cigar| match cigar {
                     &Cigar::Del(n) => {
                         first_cigar_str += &n.to_owned().to_string();
@@ -257,7 +255,7 @@ fn main() {
                     let sa_list = sa.split(";").collect::<Vec<&str>>();
 
                     if sa_list.len() > cli.max_supp_alignm {
-                        break;
+                        continue;
                     }
 
                     let sa_list_clean = sa_list.iter().filter(|x| x.len() > 0);
@@ -276,10 +274,12 @@ fn main() {
                 //
                 // In order to remove it. next step I will compare each adjacent alignment pairs. if the overlap of the region
                 // is very long. one of them will be removed.
+                //
 
-                if cli.pct_overlap > 0.0 {
+
+                if cli.max_pct_overlap >= 0.0 {
                     let mut curr_len = alignment_vec.len();
-
+                    // dbg!("asdf");
                     loop {
                         for i in 1..alignment_vec.len() {
                             let j = i - 1;
@@ -290,9 +290,8 @@ fn main() {
                             } else {
                                 // dbg!(&a,&b);
                                 // determine whether to remove one alignment
-                                if overlap(&a.start, &a.end, &b.start, &b.end, 0.8f64) {
+                                if overlap(&a.start, &a.end, &b.start, &b.end, cli.max_pct_overlap) {
                                     alignment_vec.remove(j);
-
                                     break;
                                 }
                             }
@@ -417,7 +416,7 @@ fn main() {
                 match x {
                     &Cigar::Del(n) => {
                         right_consume -= n;
-                        if n > cli.indel_min {
+                        if n >= cli.indel_min {
                             // report one event
                             let aligments_event = AlignmentEvent::new(
                                 &contig_name,
@@ -524,7 +523,8 @@ fn main() {
                 let rrr: String;
                 if cli.verbose {
                     rrr = format!(
-                        "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\tstrand:{}\tflag:{}\n",
+                        // "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\tstrand:{}\tflag:{}\n",
+                        "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\tstrand:{}\tflag:{}\n",
                         x.lchrom,
                         x.lstart,
                         x.lend,
@@ -534,8 +534,13 @@ fn main() {
                         x.rend,
                         x.rstrand,
                         x.events_num,
+                        // "excord-lr-alignment-event",
+                        // std::str::from_utf8(record.qname()).unwrap()
                         "excord-lr-alignment-event",
-                        std::str::from_utf8(record.qname()).unwrap()
+                        std::str::from_utf8(record.qname()).unwrap(),
+                        &strand,
+                        record.flags()
+
                     );
                 } else {
                     rrr = format!(
