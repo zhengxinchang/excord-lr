@@ -27,7 +27,7 @@ use aligments_event::*;
 #[derive(Parser, Debug)]
 #[command(name = "excord-LR")]
 #[command(author = "Xinchang Zheng <zhengxc93@gmail.com>")]
-#[command(version = "0.1.8")]
+#[command(version = "0.1.9")]
 #[command(about = "
 Extract Structural Variation Signals from Long-Read BAMs
 Contact: Xinchang Zheng <zhengxc93@gmail.com,Xinchang.Zheng@bcm.edu>
@@ -443,11 +443,11 @@ fn main() {
                         left_consume += n;
                     }
                     &Cigar::Ins(n) => {
-                        if n > cli.indel_min {
+                        if n >= cli.indel_min {
                             let aligments_event = AlignmentEvent::new(
                                 &contig_name,
                                 &left_consume,
-                                &right_consume,
+                                &n,
                                 &(0u32),
                                 &pos,
                                 &strand,
