@@ -1,15 +1,14 @@
-
 /// # Type of SVs in alignment event
-/// 
+///
 /// Have not beed used.
-/// 
-#[derive(Debug,Clone,PartialEq)]
+///
+#[derive(Debug, Clone, PartialEq)]
 pub enum AlignEventType {
     Ins,
-    Del
+    Del,
 }
 
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 /// struct for alignment event
 /// left and right reference consume will sum the length of D M = X for the left/right part of d
 pub struct AlignmentEvent {
@@ -22,7 +21,7 @@ pub struct AlignmentEvent {
     pub rend: u32,
     pub rstrand: i32, // true = forward
     pub events_num: i32,
-    pub svtype:AlignEventType
+    pub svtype: AlignEventType,
 }
 
 impl AlignmentEvent {
@@ -33,7 +32,7 @@ impl AlignmentEvent {
         event_len: &u32,
         pos: &i64,
         strand: &i32,
-        sv_type: Option<AlignEventType>
+        sv_type: Option<AlignEventType>,
     ) -> AlignmentEvent {
         let chrom_clean: String;
         if chrom.starts_with(&"chr".to_string()) {
@@ -42,6 +41,7 @@ impl AlignmentEvent {
             chrom_clean = chrom.to_string();
         }
         let pos2 = *pos as u32;
+
         AlignmentEvent {
             lchrom: chrom_clean.clone(),
             lstart: pos2,
@@ -52,7 +52,7 @@ impl AlignmentEvent {
             rend: pos2 + left_consume + event_len + right_consume,
             rstrand: *strand,
             events_num: 1i32,
-            svtype:sv_type.unwrap()
+            svtype: sv_type.unwrap(),
         }
     }
 }

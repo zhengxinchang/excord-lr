@@ -27,7 +27,7 @@ use aligments_event::*;
 #[derive(Parser, Debug)]
 #[command(name = "excord-LR")]
 #[command(author = "Xinchang Zheng <zhengxc93@gmail.com>")]
-#[command(version = "0.1.10")]
+#[command(version = "0.1.11")]
 #[command(about = "
 Extract Structural Variation Signals from Long-Read BAMs
 Contact: Xinchang Zheng <zhengxc93@gmail.com,Xinchang.Zheng@bcm.edu>
@@ -443,7 +443,8 @@ fn main() {
                         left_consume += n;
                     }
                     &Cigar::Ins(n) => {
-                        right_consume -= n;
+                        
+                        
                         if n >= cli.indel_min {
                             let aligments_event = AlignmentEvent::new(
                                 &contig_name,
@@ -457,7 +458,9 @@ fn main() {
                             // dbg!("insertion",&aligments_event);
                             alignments_event_vec.push(aligments_event);
                         }
-                        left_consume += n;
+                        // do not recaculate the comsume, beacuse the INS does not take account for the reference.
+                        // right_consume -= n;
+                        // left_consume += n;
                     }
                     &Cigar::Match(n) => {
                         left_consume += n;
