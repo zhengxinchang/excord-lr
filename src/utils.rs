@@ -148,11 +148,11 @@ pub fn absolute_path(path: impl AsRef<Path>) -> io::Result<PathBuf> {
 }
 
 /// # calucate the overlap between the left interval and the right interval.
-/// 
-/// max_over_pct represents the max percent of overlap threshold. Any bed 
-/// record which overlap of left and right intervals more than 
+///
+/// max_over_pct represents the max percent of overlap threshold. Any bed
+/// record which overlap of left and right intervals more than
 /// `max_over_pct * min(interval_a, interval_b)` will not be reported.
-/// 
+///
 pub fn overlap(a_start: &i64, a_end: &i64, b_start: &i64, b_end: &i64, max_over_pct: f64) -> bool {
     // dbg!(&a_start,&a_end,&b_start,&b_end);
     if a_end < b_start || a_start > b_end {
@@ -179,7 +179,6 @@ pub fn overlap(a_start: &i64, a_end: &i64, b_start: &i64, b_end: &i64, max_over_
                 // b---------------b
                 ov = (b_end - a_start) as f64 / min_len as f64;
             } else {
-
                 ov = (a_end - a_start) as f64 / min_len as f64;
             }
         }

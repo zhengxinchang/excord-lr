@@ -27,7 +27,7 @@ use aligments_event::*;
 #[derive(Parser, Debug)]
 #[command(name = "excord-LR")]
 #[command(author = "Xinchang Zheng <zhengxc93@gmail.com>")]
-#[command(version = "0.1.11")]
+#[command(version = "0.1.12")]
 #[command(about = "
 Extract Structural Variation Signals from Long-Read BAMs
 Contact: Xinchang Zheng <zhengxc93@gmail.com,Xinchang.Zheng@bcm.edu>
@@ -78,8 +78,8 @@ struct Cli {
     split_only: bool,
 
     /// Percent of overlap to discard a potential false positive record[Optional]
-    #[arg(short='p', long)]
-    max_pct_overlap: Option<f64> ,
+    #[arg(short = 'p', long, default_value_t = 0.0)]
+    max_pct_overlap: f64,
 
     /// Maximal number of SA to include a record
     #[arg(short = 'k', long, default_value_t = 4)]
@@ -123,6 +123,7 @@ fn main() {
     bam.set_threads(cli.thread).unwrap();
     let mut record = Record::new();
     let mut alignment_vec: Vec<SplitReadEvent> = Vec::new();
+    let mut alignments_event_vec: Vec<AlignmentEvent> = vec![];
 
     while let Some(result) = bam.read(&mut record) {
         match result {
@@ -276,33 +277,97 @@ fn main() {
                 // is very long. one of them will be removed.
                 //
 
+                // let mut curr_len = alignment_vec.len();
+                // // dbg!("asdf");
+                // loop {
+                //     for i in 1..alignment_vec.len() {
+                //         let j = i - 1;
+                //         let a: &SplitReadEvent = &alignment_vec[j];
+                //         let b: &SplitReadEvent = &alignment_vec[i];
+                //         if a.chrom != b.chrom {
+                //             continue;
+                //         } else {
+                //             // dbg!(&a,&b);
+                //             // determine whether to remove one alignment
+                //             if overlap(&a.start, &a.end, &b.start, &b.end, cli.max_pct_overlap.unwrap()) {
+                //                 alignment_vec.remove(j);
+                //                 break;
+                //             }
+                //         }
+                //     }
+                //     if curr_len == alignment_vec.len() {
+                //         break;
+                //     } else {
+                //         curr_len = alignment_vec.len();
+                //     }
+                // }
 
-                if cli.max_pct_overlap != None {
-                    let mut curr_len = alignment_vec.len();
-                    // dbg!("asdf");
-                    loop {
-                        for i in 1..alignment_vec.len() {
-                            let j = i - 1;
-                            let a: &SplitReadEvent = &alignment_vec[j];
-                            let b: &SplitReadEvent = &alignment_vec[i];
-                            if a.chrom != b.chrom {
-                                continue;
-                            } else {
-                                // dbg!(&a,&b);
-                                // determine whether to remove one alignment
-                                if overlap(&a.start, &a.end, &b.start, &b.end, cli.max_pct_overlap.unwrap()) {
-                                    alignment_vec.remove(j);
-                                    break;
+                // process the large insertion
+                //
+                // Rules:
+                // 1. Only primary and one supplimentary alignment
+                // 2. Must have overlap
+                // 3. Both alignment should have a soft-clip more than 1kp.
+                // 4. Both alignment have same chormosome
+                if alignment_vec.len() == 2 {
+                    let a = alignment_vec.first().clone().unwrap();
+                    let b = alignment_vec.last().clone().unwrap();
+
+                    //2. Must have overlap
+                    if overlap(&a.start, &a.end, &b.start, &b.end, cli.max_pct_overlap) {
+                        // 3. Both alignment should have a soft-clip more than 1kp.
+                        if *a.cigar_map.get(&'S').unwrap() > 1000u32
+                            && *b.cigar_map.get(&'s').unwrap() > 1000u32
+                        {
+                            if a.chrom == b.chrom {
+                                if a.strand == b.strand {
+                                    // will generate a new alignment event
+                                    alignments_event_vec.push(AlignmentEvent {
+                                        lchrom: a.chrom.clone(),
+                                        lstart: a.strand as u32,
+                                        lend: a.end as u32,
+                                        lstrand: a.strand,
+                                        rchrom: b.chrom.clone(),
+                                        rstart: a.start as u32,
+                                        rend: a.start as u32, // TODO: should estimate the length of insertions and add it at here.
+                                        rstrand: b.strand,
+                                        events_num: 1,
+                                        svtype: AlignEventType::Ins,
+                                    });
+                                    // clear previous split events
+                                    alignment_vec.clear();
                                 }
                             }
                         }
-                        if curr_len == alignment_vec.len() {
-                            break;
-                        } else {
-                            curr_len = alignment_vec.len();
-                        }
                     }
                 }
+
+
+                // process the super large insertion. e.g. a insertion larger than average length of long-read
+                //
+                // Rules:
+                // 1. Only primary alignment
+                // 3. Alignment should have a soft-clip more than 1kp.
+
+                if alignment_vec.len() ==1 {
+                    let a = alignment_vec.first().clone().unwrap();
+                    if *a.cigar_map.get(&'S').unwrap() > 1000u32 {
+                        alignments_event_vec.push(AlignmentEvent {
+                            lchrom: a.chrom.clone(),
+                            lstart: a.strand as u32,
+                            lend: a.end as u32,
+                            lstrand: a.strand,
+                            rchrom: a.chrom.clone(),
+                            rstart: a.start as u32,
+                            rend: a.start as u32,
+                            rstrand: a.strand,
+                            events_num: 1,
+                            svtype: AlignEventType::Ins,
+                        });
+                        alignment_vec.clear();
+                    }
+                }
+
 
                 for i in 1..alignment_vec.len() {
                     let j = i - 1;
@@ -409,7 +474,6 @@ fn main() {
                 }
             }
 
-            let mut alignments_event_vec: Vec<AlignmentEvent> = vec![];
             let mut left_consume = 0u32;
             let mut right_consume = total_consume;
             for x in cigar.into_iter() {
@@ -425,7 +489,7 @@ fn main() {
                                 &n,
                                 &pos,
                                 &strand,
-                                Some(AlignEventType::Del)
+                                Some(AlignEventType::Del),
                             );
                             alignments_event_vec.push(aligments_event);
 
@@ -443,8 +507,6 @@ fn main() {
                         left_consume += n;
                     }
                     &Cigar::Ins(n) => {
-                        
-                        
                         if n >= cli.indel_min {
                             let aligments_event = AlignmentEvent::new(
                                 &contig_name,
@@ -453,7 +515,7 @@ fn main() {
                                 &(0u32),
                                 &pos,
                                 &strand,
-                                Some(AlignEventType::Ins)
+                                Some(AlignEventType::Ins),
                             );
                             // dbg!("insertion",&aligments_event);
                             alignments_event_vec.push(aligments_event);
@@ -496,7 +558,9 @@ fn main() {
                         let a: AlignmentEvent = merge1[pidx].clone();
                         let b: AlignmentEvent = merge1[idx].clone();
                         // dbg!(&cigar,&a,&b, b.lend.abs_diff(a.rstart));
-                        if b.lend.abs_diff(a.rstart) < cli.merge_min && (a.svtype == AlignEventType::Del && b.svtype == AlignEventType::Del) {
+                        if b.lend.abs_diff(a.rstart) < cli.merge_min
+                            && (a.svtype == AlignEventType::Del && b.svtype == AlignEventType::Del)
+                        {
                             let c: AlignmentEvent = AlignmentEvent {
                                 lchrom: a.lchrom,
                                 lstart: a.lstart,
@@ -507,7 +571,7 @@ fn main() {
                                 rend: b.rend,
                                 rstrand: b.rstrand,
                                 events_num: 1,
-                                svtype:AlignEventType::Del
+                                svtype: AlignEventType::Del,
                             };
                             merge2.push(c);
                         } else {
@@ -548,7 +612,6 @@ fn main() {
                         std::str::from_utf8(record.qname()).unwrap(),
                         &strand,
                         record.flags()
-
                     );
                 } else {
                     rrr = format!(
@@ -568,5 +631,6 @@ fn main() {
                 f.write(rrr.as_bytes()).unwrap();
             });
         }
+        alignments_event_vec.clear();
     }
 }
