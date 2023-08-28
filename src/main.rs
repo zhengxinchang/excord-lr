@@ -27,7 +27,7 @@ use aligments_event::*;
 #[derive(Parser, Debug)]
 #[command(name = "excord-LR")]
 #[command(author = "Xinchang Zheng <zhengxc93@gmail.com>")]
-#[command(version = "0.1.12")]
+#[command(version = "0.1.13")]
 #[command(about = "
 Extract Structural Variation Signals from Long-Read BAMs
 Contact: Xinchang Zheng <zhengxc93@gmail.com,Xinchang.Zheng@bcm.edu>
@@ -317,7 +317,7 @@ fn main() {
                     if overlap(&a.start, &a.end, &b.start, &b.end, cli.max_pct_overlap) {
                         // 3. Both alignment should have a soft-clip more than 1kp.
                         if *a.cigar_map.get(&'S').unwrap() > 1000u32
-                            && *b.cigar_map.get(&'s').unwrap() > 1000u32
+                            && *b.cigar_map.get(&'S').unwrap() > 1000u32
                         {
                             if a.chrom == b.chrom {
                                 if a.strand == b.strand {
