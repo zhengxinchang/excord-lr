@@ -65,3 +65,6 @@ treadname2:build
 
 cp:build
 	scp -r -oHostKeyAlgorithms=+ssh-rsa target/x86_64-unknown-linux-musl/release/excord-lr    zhengxc@10.51.131.125:/workspace/zhengxc/project/stix/test/
+
+tlargeInsCigar:build
+	time target/x86_64-unknown-linux-musl/release/excord-lr --verbose  -b test/m54328_180922_235017_57738046_ccstest.bam  -o test/m54328_180922_235017_57738046_ccstest.bed

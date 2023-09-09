@@ -1,4 +1,6 @@
-use crate::split_read_event::SplitReadEvent;
+use rust_htslib::bam::Record;
+
+use crate::{aligments_event::AlignmentEvent, split_read_event::SplitReadEvent};
 use std::{
     cmp::Ordering,
     collections::HashMap,
@@ -189,4 +191,93 @@ pub fn overlap(a_start: &i64, a_end: &i64, b_start: &i64, b_end: &i64, max_over_
             return false;
         }
     }
+}
+
+pub fn get_alignment_event_record(
+    x: &AlignmentEvent,
+    verbose: &bool,
+    record: &Record,
+    strand: &i32,
+    tag: &str,
+) -> String {
+    let rrr: String;
+    if *verbose {
+        rrr = format!(
+            // "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\tstrand:{}\tflag:{}\n",
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\tstrand:{}\tflag:{}\n",
+            x.lchrom,
+            x.lstart,
+            x.lend,
+            x.lstrand,
+            x.rchrom,
+            x.rstart,
+            x.rend,
+            x.rstrand,
+            x.events_num,
+            // "excord-lr-alignment-event",
+            // std::str::from_utf8(record.qname()).unwrap()
+            tag,
+            std::str::from_utf8(record.qname()).unwrap(),
+            strand,
+            record.flags()
+        );
+    } else {
+        rrr = format!(
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+            x.lchrom,
+            x.lstart,
+            x.lend,
+            x.lstrand,
+            x.rchrom,
+            x.rstart,
+            x.rend,
+            x.rstrand,
+            x.events_num
+        );
+    }
+    return rrr;
+}
+
+pub fn get_alignment_split_record(
+    a: &SplitReadEvent,
+    b: &SplitReadEvent,
+    verbose: &bool,
+    record: &Record,
+    strand: &i32,
+    align_vec_len: &usize,
+    tag: &str,
+) -> String {
+    let bed_line: String;
+    if *verbose {
+        bed_line = format!(
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\tstrand:{}\tflag:{}\n",
+            a.chrom,
+            a.start,
+            a.end,
+            a.strand,
+            b.chrom,
+            b.start,
+            b.end,
+            b.strand,
+            *align_vec_len - 1,
+            tag,
+            std::str::from_utf8(record.qname()).unwrap(),
+            strand,
+            record.flags()
+        );
+    } else {
+        bed_line = format!(
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+            a.chrom,
+            a.start,
+            a.end,
+            a.strand,
+            b.chrom,
+            b.start,
+            b.end,
+            b.strand,
+            *align_vec_len - 1
+        );
+    }
+    return bed_line;
 }

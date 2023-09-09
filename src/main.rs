@@ -27,7 +27,7 @@ use aligments_event::*;
 #[derive(Parser, Debug)]
 #[command(name = "excord-LR")]
 #[command(author = "Xinchang Zheng <zhengxc93@gmail.com>")]
-#[command(version = "0.1.13")]
+#[command(version = "0.1.14")]
 #[command(about = "
 Extract Structural Variation Signals from Long-Read BAMs
 Contact: Xinchang Zheng <zhengxc93@gmail.com,Xinchang.Zheng@bcm.edu>
@@ -122,8 +122,6 @@ fn main() {
     let mut bam = bam::Reader::from_path(_bam).unwrap();
     bam.set_threads(cli.thread).unwrap();
     let mut record = Record::new();
-    let mut alignment_vec: Vec<SplitReadEvent> = Vec::new();
-    let mut alignments_event_vec: Vec<AlignmentEvent> = vec![];
 
     while let Some(result) = bam.read(&mut record) {
         match result {
@@ -160,11 +158,12 @@ fn main() {
             ReqStrand::Forward => 1,
             ReqStrand::Reverse => -1,
         };
+        let mut alignments_event_vec: Vec<AlignmentEvent> = vec![];
         match record.aux("SA".as_bytes()) {
             Ok(_sa) => {
                 /* put the preliminary alignment to  */
                 // dbg!(&record.cigar());
-
+                let mut alignment_vec: Vec<SplitReadEvent> = Vec::new();
                 let mapq = record.mapq();
                 // let cigar_stats_nuc = record.cigar_stats_nucleotides();
                 let mut cigar_map = HashMap::from([
@@ -193,6 +192,9 @@ fn main() {
                             |--------Type of this Enum
                 */
                 let mut first_cigar_str = "".to_string();
+                // let mut left_S:u32 = 0;
+                // let mut right_S:u32 = 0;
+                // let mut is_have_left_S:bool = false;
                 record.cigar().iter().for_each(|cigar| match cigar {
                     &Cigar::Del(n) => {
                         first_cigar_str += &n.to_owned().to_string();
@@ -219,6 +221,12 @@ fn main() {
                         first_cigar_str += &n.to_owned().to_string();
                         first_cigar_str += &"S".to_string();
                         cigar_map.entry('S').and_modify(|e| *e += n.to_owned());
+                        // if is_have_left_S == false{
+                        //     is_have_left_S = true;
+                        //     left_S = n.to_owned();
+                        // }else{
+                        //     right_S = n.to_owned();
+                        // }
                     }
                     &Cigar::HardClip(n) => {
                         first_cigar_str += &n.to_owned().to_string();
@@ -277,31 +285,6 @@ fn main() {
                 // is very long. one of them will be removed.
                 //
 
-                // let mut curr_len = alignment_vec.len();
-                // // dbg!("asdf");
-                // loop {
-                //     for i in 1..alignment_vec.len() {
-                //         let j = i - 1;
-                //         let a: &SplitReadEvent = &alignment_vec[j];
-                //         let b: &SplitReadEvent = &alignment_vec[i];
-                //         if a.chrom != b.chrom {
-                //             continue;
-                //         } else {
-                //             // dbg!(&a,&b);
-                //             // determine whether to remove one alignment
-                //             if overlap(&a.start, &a.end, &b.start, &b.end, cli.max_pct_overlap.unwrap()) {
-                //                 alignment_vec.remove(j);
-                //                 break;
-                //             }
-                //         }
-                //     }
-                //     if curr_len == alignment_vec.len() {
-                //         break;
-                //     } else {
-                //         curr_len = alignment_vec.len();
-                //     }
-                // }
-
                 // process the large insertion
                 //
                 // Rules:
@@ -314,34 +297,71 @@ fn main() {
                     let b = alignment_vec.last().clone().unwrap();
 
                     //2. Must have overlap
-                    if overlap(&a.start, &a.end, &b.start, &b.end, cli.max_pct_overlap) {
-                        // 3. Both alignment should have a soft-clip more than 1kp.
-                        if *a.cigar_map.get(&'S').unwrap() > 1000u32
-                            && *b.cigar_map.get(&'S').unwrap() > 1000u32
-                        {
-                            if a.chrom == b.chrom {
-                                if a.strand == b.strand {
-                                    // will generate a new alignment event
-                                    alignments_event_vec.push(AlignmentEvent {
-                                        lchrom: a.chrom.clone(),
-                                        lstart: a.strand as u32,
-                                        lend: a.end as u32,
-                                        lstrand: a.strand,
-                                        rchrom: b.chrom.clone(),
-                                        rstart: a.start as u32,
-                                        rend: a.start as u32, // TODO: should estimate the length of insertions and add it at here.
-                                        rstrand: b.strand,
-                                        events_num: 1,
-                                        svtype: AlignEventType::Ins,
-                                    });
-                                    // clear previous split events
-                                    alignment_vec.clear();
+
+                    // 3. Both alignment should have a soft-clip more than 1kp.
+                    if *a.cigar_map.get(&'S').unwrap() > 1000u32 {
+                        if a.chrom == b.chrom {
+                            if a.strand == b.strand {
+                                if overlap(&a.start, &a.end, &b.start, &b.end, cli.max_pct_overlap)
+                                {
+                                    if *b.cigar_map.get(&'S').unwrap() > 1000u32 {
+                                        // will generate a new alignment event
+
+                                        let x = AlignmentEvent {
+                                            lchrom: a.chrom.clone(),
+                                            lstart: a.start as u32,
+                                            lend: a.end as u32,
+                                            lstrand: a.strand,
+                                            rchrom: b.chrom.clone(),
+                                            rstart: a.end as u32,
+                                            rend: a.end as u32, // TODO: should estimate the length of insertions and add it at here.
+                                            rstrand: b.strand,
+                                            events_num: 1,
+                                            svtype: AlignEventType::Ins,
+                                        };
+                                        
+                                        // alignment_vec.clear();
+                                        let rrr = get_alignment_event_record(
+                                            &x,
+                                            &cli.verbose,
+                                            &record,
+                                            &strand,
+                                            &"excord-lr-alignment-event-large-ins",
+                                        );
+
+                                        f.write(rrr.as_bytes()).unwrap();
+                                    }
                                 }
                             }
+                        } else {
+                            let x = AlignmentEvent {
+                                lchrom: a.chrom.clone(),
+                                lstart: a.start as u32,
+                                lend: a.end as u32,
+                                lstrand: a.strand,
+                                rchrom: a.chrom.clone(),
+                                rstart: a.end as u32,
+                                rend: a.end as u32,
+                                rstrand: a.strand,
+                                events_num: 1,
+                                svtype: AlignEventType::Ins,
+                            };
+                            // alignment_vec.clear();
+                            // f.write("#Found Large Insertion\tType:\tPrimary Only".as_bytes()).unwrap();
+                            // dbg!("Primary + Only".to_string(),&alignments_event_vec);
+                            // // println!();
+                            // let ddd = format!("#Found Large Insertion\tType:\tPrimary Only\n{:?}\n",
+                            // &x
+                            // );
+                            // f.write(&ddd.as_bytes()).unwrap();
+
+                            let rrr =
+                                get_alignment_event_record(&x, &cli.verbose, &record, &strand,&"excord-lr-alignment-event-large-ins");
+
+                            f.write(rrr.as_bytes()).unwrap();
                         }
                     }
                 }
-
 
                 // process the super large insertion. e.g. a insertion larger than average length of long-read
                 //
@@ -349,25 +369,36 @@ fn main() {
                 // 1. Only primary alignment
                 // 3. Alignment should have a soft-clip more than 1kp.
 
-                if alignment_vec.len() ==1 {
+                if alignment_vec.len() == 1 {
                     let a = alignment_vec.first().clone().unwrap();
                     if *a.cigar_map.get(&'S').unwrap() > 1000u32 {
-                        alignments_event_vec.push(AlignmentEvent {
+                        // alignments_event_vec.push();
+                        let x = AlignmentEvent {
                             lchrom: a.chrom.clone(),
-                            lstart: a.strand as u32,
+                            lstart: a.start as u32,
                             lend: a.end as u32,
                             lstrand: a.strand,
                             rchrom: a.chrom.clone(),
-                            rstart: a.start as u32,
-                            rend: a.start as u32,
+                            rstart: a.end as u32,
+                            rend: a.end as u32,
                             rstrand: a.strand,
                             events_num: 1,
                             svtype: AlignEventType::Ins,
-                        });
-                        alignment_vec.clear();
+                        };
+                        // alignment_vec.clear();
+                        // f.write("#Found Large Insertion\tType:\tPrimary Only".as_bytes()).unwrap();
+                        // dbg!("Primary + Only".to_string(),&alignments_event_vec);
+                        // // println!();
+                        // let ddd = format!("#Found Large Insertion\tType:\tPrimary Only\n{:?}\n",
+                        // &x
+                        // );
+                        // f.write(&ddd.as_bytes()).unwrap();
+
+                        let rrr = get_alignment_event_record(&x, &cli.verbose, &record, &strand,&"excord-lr-alignment-event-large-ins");
+
+                        f.write(rrr.as_bytes()).unwrap();
                     }
                 }
-
 
                 for i in 1..alignment_vec.len() {
                     let j = i - 1;
@@ -376,76 +407,96 @@ fn main() {
                     let bed_line: String;
                     // dbg!(&a);
                     if alignment_pos_cmp(a, b) == Ordering::Greater {
-                        if cli.verbose {
-                            bed_line = format!(
-                                "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\tstrand:{}\tflag:{}\n",
-                                b.chrom,
-                                b.start,
-                                b.end,
-                                b.strand,
-                                a.chrom,
-                                a.start,
-                                a.end,
-                                a.strand,
-                                alignment_vec.len() - 1,
-                                "excord-lr-split-read",
-                                std::str::from_utf8(record.qname()).unwrap(),
-                                &strand,
-                                record.flags()
-                            );
-                        } else {
-                            bed_line = format!(
-                                "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
-                                b.chrom,
-                                b.start,
-                                b.end,
-                                b.strand,
-                                a.chrom,
-                                a.start,
-                                a.end,
-                                a.strand,
-                                alignment_vec.len() - 1
-                            );
-                        }
+                        // if cli.verbose {
+                        //     bed_line = format!(
+                        //         "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\tstrand:{}\tflag:{}\n",
+                        //         b.chrom,
+                        //         b.start,
+                        //         b.end,
+                        //         b.strand,
+                        //         a.chrom,
+                        //         a.start,
+                        //         a.end,
+                        //         a.strand,
+                        //         alignment_vec.len() - 1,
+                        //         "excord-lr-split-read",
+                        //         std::str::from_utf8(record.qname()).unwrap(),
+                        //         &strand,
+                        //         record.flags()
+                        //     );
+                        // } else {
+                        //     bed_line = format!(
+                        //         "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+                        //         b.chrom,
+                        //         b.start,
+                        //         b.end,
+                        //         b.strand,
+                        //         a.chrom,
+                        //         a.start,
+                        //         a.end,
+                        //         a.strand,
+                        //         alignment_vec.len() - 1
+                        //     );
+                        // }
+
+                        bed_line = get_alignment_split_record(
+                            &b,
+                            &a,
+                            &cli.verbose,
+                            &record,
+                            &strand,
+                            &alignment_vec.len(),
+                            &"excord-lr-split-read"
+                        );
                     } else {
-                        if cli.verbose {
-                            bed_line = format!(
-                                "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\tstrand:{}\tflag:{}\n",
-                                a.chrom,
-                                a.start,
-                                a.end,
-                                a.strand,
-                                b.chrom,
-                                b.start,
-                                b.end,
-                                b.strand,
-                                alignment_vec.len() - 1,
-                                "excord-lr-split-read",
-                                std::str::from_utf8(record.qname()).unwrap(),
-                                &strand,
-                                record.flags()
-                            );
-                        } else {
-                            bed_line = format!(
-                                "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
-                                a.chrom,
-                                a.start,
-                                a.end,
-                                a.strand,
-                                b.chrom,
-                                b.start,
-                                b.end,
-                                b.strand,
-                                alignment_vec.len() - 1
-                            );
-                        }
+                        // if cli.verbose {
+                        //     bed_line = format!(
+                        //         "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\tstrand:{}\tflag:{}\n",
+                        //         a.chrom,
+                        //         a.start,
+                        //         a.end,
+                        //         a.strand,
+                        //         b.chrom,
+                        //         b.start,
+                        //         b.end,
+                        //         b.strand,
+                        //         alignment_vec.len() - 1,
+                        //         "excord-lr-split-read",
+                        //         std::str::from_utf8(record.qname()).unwrap(),
+                        //         &strand,
+                        //         record.flags()
+                        //     );
+                        // } else {
+                        //     bed_line = format!(
+                        //         "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+                        //         a.chrom,
+                        //         a.start,
+                        //         a.end,
+                        //         a.strand,
+                        //         b.chrom,
+                        //         b.start,
+                        //         b.end,
+                        //         b.strand,
+                        //         alignment_vec.len() - 1
+                        //     );
+                        // }
+
+                        bed_line = get_alignment_split_record(
+                            &a,
+                            &b,
+                            &cli.verbose,
+                            &record,
+                            &strand,
+                            &alignment_vec.len(),
+                            &"excord-lr-split-read"
+                        );
                     }
                     f.write(bed_line.as_bytes()).unwrap();
                 }
             }
             Err(_) => {}
         };
-        alignment_vec.clear();
+        // alignment_vec.clear();
 
         // Extract Alignment event if split_only option is disabled.
         if cli.split_only == false {
@@ -590,43 +641,13 @@ fn main() {
             } else if alignments_event_vec.len() == 1 {
                 let a: AlignmentEvent = alignments_event_vec[0usize].clone();
                 merged_alignments_event_vec.push(a);
+                // let ddd = format!("## alignment_vec:{:?}\n",
+                // &alignments_event_vec
+                // );
+                // f.write(&ddd.as_bytes()).unwrap();
             }
             merged_alignments_event_vec.into_iter().for_each(|x| {
-                let rrr: String;
-                if cli.verbose {
-                    rrr = format!(
-                        // "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\tstrand:{}\tflag:{}\n",
-                        "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\tstrand:{}\tflag:{}\n",
-                        x.lchrom,
-                        x.lstart,
-                        x.lend,
-                        x.lstrand,
-                        x.rchrom,
-                        x.rstart,
-                        x.rend,
-                        x.rstrand,
-                        x.events_num,
-                        // "excord-lr-alignment-event",
-                        // std::str::from_utf8(record.qname()).unwrap()
-                        "excord-lr-alignment-event",
-                        std::str::from_utf8(record.qname()).unwrap(),
-                        &strand,
-                        record.flags()
-                    );
-                } else {
-                    rrr = format!(
-                        "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
-                        x.lchrom,
-                        x.lstart,
-                        x.lend,
-                        x.lstrand,
-                        x.rchrom,
-                        x.rstart,
-                        x.rend,
-                        x.rstrand,
-                        x.events_num
-                    );
-                }
+                let rrr = get_alignment_event_record(&x, &cli.verbose, &record, &strand,&"excord-lr-alignment-event");
 
                 f.write(rrr.as_bytes()).unwrap();
             });
