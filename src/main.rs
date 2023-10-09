@@ -302,6 +302,7 @@ fn main() {
                     if *a.cigar_map.get(&'S').unwrap() > 1000u32 {
                         if a.chrom == b.chrom {
                             if a.strand == b.strand {
+                                // if overlap > max_pct_overlap. default value of max_pct_overlap is 0 ,means each overlap pass the examination.
                                 if overlap(&a.start, &a.end, &b.start, &b.end, cli.max_pct_overlap)
                                 {
                                     if *b.cigar_map.get(&'S').unwrap() > 1000u32 {
