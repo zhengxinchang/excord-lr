@@ -6,7 +6,7 @@ use rust_htslib::{
         // ext::BamRecordExtensions,
         record::{Aux, Cigar},
         Read,
-        Record,
+        Record
     },
 };
 use std::{
@@ -126,6 +126,12 @@ fn main() {
     let mut record = Record::new();
 
     while let Some(result) = bam.read(&mut record) {
+        // if str::from_utf8(&record.qname()).unwrap() == "4aa7ca6c-d970-4b23-90ec-6e449956685f".to_string() {
+        //     dbg!(&record);
+        // }
+
+        // dbg!(str::from_utf8(&record.qname()).unwrap());
+
         match result {
             Err(_) => break, //exit if the last one was processed.
             Ok(()) => {}
@@ -152,6 +158,10 @@ fn main() {
             dbg!("found filtered flag", record.qname());
             continue;
         }
+
+        // if str::from_utf8(&record.qname()).unwrap() == "4aa7ca6c-d970-4b23-90ec-6e449956685f".to_string() {
+        //     dbg!(&record);
+        // }
 
         let st = record.strand().to_owned(); // MUST move out of match, Because of mutable borrow by strand().
                                              // Start to extact SA signals
@@ -515,6 +525,12 @@ fn main() {
                 }
             }
 
+            // if str::from_utf8(&record.qname()).unwrap() == "4aa7ca6c-d970-4b23-90ec-6e449956685f".to_string() {
+            //     dbg!(&alignments_event_vec);
+            //     dbg!(&alignments_event_vec.len());
+
+            // }
+
             // do merge step
             let mut merged_alignments_event_vec: Vec<AlignmentEvent> = vec![];
 
@@ -537,7 +553,7 @@ fn main() {
                         events_num: 1, // hard code 1, STIX will parse it as a split-event.
                         svtype: AlignEventType::Del,
                     };
-             
+
                     merged_alignments_event_vec.push(c);
                 } else {
                     merged_alignments_event_vec.push(a);
@@ -549,12 +565,14 @@ fn main() {
                 let mut iter_times = 5u32;
 
                 // try to merge several times to handle more than two adjecent dels.
+                // 1. merge 5 times, each time will based on the previous one.
+                // 2. If the original vec is length as n, we iterally compare previous and next for the 2 to n-1 elements.
+                // 3. Only works in Del
                 loop {
                     iter_times -= 1;
                     let mut idx = 1usize;
-        
+
                     loop {
-               
                         if idx > (&merge1.len() - 2) {
                             break;
                         }
@@ -563,49 +581,63 @@ fn main() {
                         let prv: AlignmentEvent = merge1[pidx].clone();
                         let target: AlignmentEvent = merge1[idx].clone();
                         let nxt: AlignmentEvent = merge1[nidx].clone();
-                        // dbg!(&cigar,&a,&b, b.lend.abs_diff(a.rstart));
-                        if prv.lend.abs_diff(target.rstart) < cli.merge_min
+
+                        if (prv.lend.abs_diff(target.rstart) < cli.merge_min
                             && (target.svtype == AlignEventType::Del
-                                && prv.svtype == AlignEventType::Del)
+                                && prv.svtype == AlignEventType::Del))
+                            || (target.lend.abs_diff(nxt.rstart) < cli.merge_min
+                                && (target.svtype == AlignEventType::Del
+                                    && nxt.svtype == AlignEventType::Del))
                         {
-                            let c: AlignmentEvent = AlignmentEvent {
-                                lchrom: prv.lchrom,
-                                lstart: prv.lstart,
-                                lend: prv.lend,
-                                lstrand: prv.lstrand,
-                                rchrom: target.rchrom,
-                                rstart: target.rstart,
-                                rend: target.rend,
-                                rstrand: target.rstrand,
-                                events_num: 1, // hard code 1, STIX will parse it as a split-event.
-                                svtype: AlignEventType::Del,
-                            };
-                            // merge2.push(c);
-                            merge2.push(c);
-                            idx += 1;
-                        } else if target.lend.abs_diff(nxt.rstart) < cli.merge_min
-                            && (target.svtype == AlignEventType::Del
-                                && nxt.svtype == AlignEventType::Del)
-                        {
-                            let c: AlignmentEvent = AlignmentEvent {
-                                lchrom: target.lchrom,
-                                lstart: target.lstart,
-                                lend: target.lend,
-                                lstrand: target.lstrand,
-                                rchrom: nxt.rchrom,
-                                rstart: nxt.rstart,
-                                rend: nxt.rend,
-                                rstrand: nxt.rstrand,
-                                events_num: 1, // hard code 1, STIX will parse it as a split-event.
-                                svtype: AlignEventType::Del,
-                            };
-                            // merge2.push(c);
-                            merge2.push(c);
+                            if prv.lend.abs_diff(target.rstart) < cli.merge_min
+                                && (target.svtype == AlignEventType::Del
+                                    && prv.svtype == AlignEventType::Del)
+                            {
+                                let c: AlignmentEvent = AlignmentEvent {
+                                    lchrom: prv.lchrom,
+                                    lstart: prv.lstart,
+                                    lend: prv.lend,
+                                    lstrand: prv.lstrand,
+                                    rchrom: target.rchrom,
+                                    rstart: target.rstart,
+                                    rend: target.rend,
+                                    rstrand: target.rstrand,
+                                    events_num: 1, // hard code 1, STIX will parse it as a split-event.
+                                    svtype: AlignEventType::Del,
+                                };
+                                // merge2.push(c);
+                                merge2.push(c);
+                            }
+
+                            if target.lend.abs_diff(nxt.rstart) < cli.merge_min
+                                && (target.svtype == AlignEventType::Del
+                                    && nxt.svtype == AlignEventType::Del)
+                            {
+                                let c: AlignmentEvent = AlignmentEvent {
+                                    lchrom: target.lchrom,
+                                    lstart: target.lstart,
+                                    lend: target.lend,
+                                    lstrand: target.lstrand,
+                                    rchrom: nxt.rchrom,
+                                    rstart: nxt.rstart,
+                                    rend: nxt.rend,
+                                    rstrand: nxt.rstrand,
+                                    events_num: 1, // hard code 1, STIX will parse it as a split-event.
+                                    svtype: AlignEventType::Del,
+                                };
+                                // merge2.push(c);
+                                merge2.push(c);
+                            }
                             idx += 1;
                         } else {
-                            merge2.push(prv);
-                            merge2.push(target);
-                            merge2.push(nxt);
+                            if idx == 1 {
+                                merge2.push(prv);
+                                merge2.push(target);
+                                merge2.push(nxt);
+                            } else {
+                                merge2.push(nxt);
+                            }
+
                             idx += 1;
                         }
                     }
@@ -618,8 +650,15 @@ fn main() {
                         merge1 = merge2.clone();
                         merge2.clear();
                     }
-                    merged_alignments_event_vec = merge2.clone();
                 }
+                merged_alignments_event_vec = merge2.clone();
+
+                // if str::from_utf8(&record.qname()).unwrap()
+                //     == "4aa7ca6c-d970-4b23-90ec-6e449956685f".to_string()
+                // {
+                //     dbg!(&merged_alignments_event_vec);
+                //     dbg!(&merged_alignments_event_vec.len());
+                // }
 
                 // merged_alignments_event_vec.dedup_by(same_bucket)
             } else if alignments_event_vec.len() == 1 {
