@@ -568,6 +568,20 @@ fn main() {
                 // 1. merge 5 times, each time will based on the previous one.
                 // 2. If the original vec is length as n, we iterally compare previous and next for the 2 to n-1 elements.
                 // 3. Only works in Del
+
+                // each round
+                //  [ a, b, c, d, e]
+                //    |--|--| -> idx =1
+                //       |--|--| --> idx =2
+                //          |--|--| --> idx =3 
+
+                // 5 round in total
+                // [ a, b, c, d, e] --> init
+                // [ ab, c,d,e] --> round 1
+                // [ abc, d, e] --> round 2
+                // ...
+                // round 5 ----> merged_alignment_vec and go down.
+
                 loop {
                     iter_times -= 1;
                     let mut idx = 1usize;
