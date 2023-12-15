@@ -24,10 +24,12 @@ mod utils;
 use utils::*;
 mod aligments_event;
 use aligments_event::*;
+use std::str;
+
 #[derive(Parser, Debug)]
 #[command(name = "excord-LR")]
 #[command(author = "Xinchang Zheng <zhengxc93@gmail.com>")]
-#[command(version = "0.1.14")]
+#[command(version = "0.1.15")]
 #[command(about = "
 Extract Structural Variation Signals from Long-Read BAMs
 Contact: Xinchang Zheng <zhengxc93@gmail.com,Xinchang.Zheng@bcm.edu>
@@ -147,6 +149,7 @@ fn main() {
         if record.flags().bitand(cli.exclude_flag) != 0u16
         // == 0 means not match with flag.
         {
+            dbg!("found filtered flag", record.qname());
             continue;
         }
 
@@ -159,10 +162,12 @@ fn main() {
             ReqStrand::Reverse => -1,
         };
         let mut alignments_event_vec: Vec<AlignmentEvent> = vec![];
+
         match record.aux("SA".as_bytes()) {
             Ok(_sa) => {
                 /* put the preliminary alignment to  */
                 // dbg!(&record.cigar());
+
                 let mut alignment_vec: Vec<SplitReadEvent> = Vec::new();
                 let mapq = record.mapq();
                 // let cigar_stats_nuc = record.cigar_stats_nucleotides();
@@ -315,12 +320,12 @@ fn main() {
                                             lstrand: a.strand,
                                             rchrom: b.chrom.clone(),
                                             rstart: a.end as u32,
-                                            rend: a.end as u32, // TODO: should estimate the length of insertions and add it at here.
+                                            rend: a.end as u32, // TODO: should estimate the length of insertions and add it at here. [done]
                                             rstrand: b.strand,
                                             events_num: 1,
                                             svtype: AlignEventType::Ins,
                                         };
-                                        
+
                                         // alignment_vec.clear();
                                         let rrr = get_alignment_event_record(
                                             &x,
@@ -347,17 +352,14 @@ fn main() {
                                 events_num: 1,
                                 svtype: AlignEventType::Ins,
                             };
-                            // alignment_vec.clear();
-                            // f.write("#Found Large Insertion\tType:\tPrimary Only".as_bytes()).unwrap();
-                            // dbg!("Primary + Only".to_string(),&alignments_event_vec);
-                            // // println!();
-                            // let ddd = format!("#Found Large Insertion\tType:\tPrimary Only\n{:?}\n",
-                            // &x
-                            // );
-                            // f.write(&ddd.as_bytes()).unwrap();
 
-                            let rrr =
-                                get_alignment_event_record(&x, &cli.verbose, &record, &strand,&"excord-lr-alignment-event-large-ins");
+                            let rrr = get_alignment_event_record(
+                                &x,
+                                &cli.verbose,
+                                &record,
+                                &strand,
+                                &"excord-lr-alignment-event-large-ins",
+                            );
 
                             f.write(rrr.as_bytes()).unwrap();
                         }
@@ -386,16 +388,14 @@ fn main() {
                             events_num: 1,
                             svtype: AlignEventType::Ins,
                         };
-                        // alignment_vec.clear();
-                        // f.write("#Found Large Insertion\tType:\tPrimary Only".as_bytes()).unwrap();
-                        // dbg!("Primary + Only".to_string(),&alignments_event_vec);
-                        // // println!();
-                        // let ddd = format!("#Found Large Insertion\tType:\tPrimary Only\n{:?}\n",
-                        // &x
-                        // );
-                        // f.write(&ddd.as_bytes()).unwrap();
 
-                        let rrr = get_alignment_event_record(&x, &cli.verbose, &record, &strand,&"excord-lr-alignment-event-large-ins");
+                        let rrr = get_alignment_event_record(
+                            &x,
+                            &cli.verbose,
+                            &record,
+                            &strand,
+                            &"excord-lr-alignment-event-large-ins",
+                        );
 
                         f.write(rrr.as_bytes()).unwrap();
                     }
@@ -408,38 +408,6 @@ fn main() {
                     let bed_line: String;
                     // dbg!(&a);
                     if alignment_pos_cmp(a, b) == Ordering::Greater {
-                        // if cli.verbose {
-                        //     bed_line = format!(
-                        //         "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\tstrand:{}\tflag:{}\n",
-                        //         b.chrom,
-                        //         b.start,
-                        //         b.end,
-                        //         b.strand,
-                        //         a.chrom,
-                        //         a.start,
-                        //         a.end,
-                        //         a.strand,
-                        //         alignment_vec.len() - 1,
-                        //         "excord-lr-split-read",
-                        //         std::str::from_utf8(record.qname()).unwrap(),
-                        //         &strand,
-                        //         record.flags()
-                        //     );
-                        // } else {
-                        //     bed_line = format!(
-                        //         "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
-                        //         b.chrom,
-                        //         b.start,
-                        //         b.end,
-                        //         b.strand,
-                        //         a.chrom,
-                        //         a.start,
-                        //         a.end,
-                        //         a.strand,
-                        //         alignment_vec.len() - 1
-                        //     );
-                        // }
-
                         bed_line = get_alignment_split_record(
                             &b,
                             &a,
@@ -447,41 +415,9 @@ fn main() {
                             &record,
                             &strand,
                             &alignment_vec.len(),
-                            &"excord-lr-split-read"
+                            &"excord-lr-split-read",
                         );
                     } else {
-                        // if cli.verbose {
-                        //     bed_line = format!(
-                        //         "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\tstrand:{}\tflag:{}\n",
-                        //         a.chrom,
-                        //         a.start,
-                        //         a.end,
-                        //         a.strand,
-                        //         b.chrom,
-                        //         b.start,
-                        //         b.end,
-                        //         b.strand,
-                        //         alignment_vec.len() - 1,
-                        //         "excord-lr-split-read",
-                        //         std::str::from_utf8(record.qname()).unwrap(),
-                        //         &strand,
-                        //         record.flags()
-                        //     );
-                        // } else {
-                        //     bed_line = format!(
-                        //         "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
-                        //         a.chrom,
-                        //         a.start,
-                        //         a.end,
-                        //         a.strand,
-                        //         b.chrom,
-                        //         b.start,
-                        //         b.end,
-                        //         b.strand,
-                        //         alignment_vec.len() - 1
-                        //     );
-                        // }
-
                         bed_line = get_alignment_split_record(
                             &a,
                             &b,
@@ -489,7 +425,7 @@ fn main() {
                             &record,
                             &strand,
                             &alignment_vec.len(),
-                            &"excord-lr-split-read"
+                            &"excord-lr-split-read",
                         );
                     }
                     f.write(bed_line.as_bytes()).unwrap();
@@ -497,14 +433,12 @@ fn main() {
             }
             Err(_) => {}
         };
-        // alignment_vec.clear();
 
         // Extract Alignment event if split_only option is disabled.
+
         if cli.split_only == false {
             // parse the CIGAR value for each record
             let cigar = record.cigar();
-            // dbg!(&cigar.to_string());
-            // let cigar_string = cigar.to_string();
 
             // let alignment_event_vec:Vec<AlignmentPos> = parse_alignment_event(&cigar_string);
             let mut total_consume = 0u32;
@@ -544,17 +478,6 @@ fn main() {
                                 Some(AlignEventType::Del),
                             );
                             alignments_event_vec.push(aligments_event);
-
-                            // dbg!(
-                            //     "xxx".to_string(),
-                            //     &record.pos(),
-                            //     &cigar.len(),
-                            //     &cigar.to_string(),
-                            //     &left_consume,
-                            //     &right_consume,
-                            //     &n,
-                            //     aligments_event.get_bed_record()
-                            // );
                         }
                         left_consume += n;
                     }
@@ -563,7 +486,7 @@ fn main() {
                             let aligments_event = AlignmentEvent::new(
                                 &contig_name,
                                 &left_consume,
-                                &n,
+                                &n, // for Insetions derived from CIGAR value, encode the length in right region.
                                 &(0u32),
                                 &pos,
                                 &strand,
@@ -595,60 +518,123 @@ fn main() {
             // do merge step
             let mut merged_alignments_event_vec: Vec<AlignmentEvent> = vec![];
 
-            // if cli.debug {
-            //     dbg!(&merged_alignments_event_vec);
-            // }
-
-            if alignments_event_vec.len() > 1 {
+            // merge two alignments if needed
+            if alignments_event_vec.len() == 2 {
+                let a: AlignmentEvent = alignments_event_vec[0].clone();
+                let b: AlignmentEvent = alignments_event_vec[1].clone();
+                if b.lend.abs_diff(a.rstart) < cli.merge_min
+                    && (a.svtype == AlignEventType::Del && b.svtype == AlignEventType::Del)
+                {
+                    let c: AlignmentEvent = AlignmentEvent {
+                        lchrom: a.lchrom,
+                        lstart: a.lstart,
+                        lend: a.lend,
+                        lstrand: a.lstrand,
+                        rchrom: b.rchrom,
+                        rstart: b.rstart,
+                        rend: b.rend,
+                        rstrand: b.rstrand,
+                        events_num: 1, // hard code 1, STIX will parse it as a split-event.
+                        svtype: AlignEventType::Del,
+                    };
+             
+                    merged_alignments_event_vec.push(c);
+                } else {
+                    merged_alignments_event_vec.push(a);
+                    merged_alignments_event_vec.push(b);
+                }
+            } else if alignments_event_vec.len() > 2 {
                 let mut merge1: Vec<AlignmentEvent> = alignments_event_vec.clone();
                 let mut merge2: Vec<AlignmentEvent> = vec![];
                 let mut iter_times = 5u32;
+
+                // try to merge several times to handle more than two adjecent dels.
                 loop {
                     iter_times -= 1;
-                    for idx in 1..merge1.len() {
+                    let mut idx = 1usize;
+        
+                    loop {
+               
+                        if idx > (&merge1.len() - 2) {
+                            break;
+                        }
                         let pidx = idx - 1;
-                        let a: AlignmentEvent = merge1[pidx].clone();
-                        let b: AlignmentEvent = merge1[idx].clone();
+                        let nidx = idx + 1;
+                        let prv: AlignmentEvent = merge1[pidx].clone();
+                        let target: AlignmentEvent = merge1[idx].clone();
+                        let nxt: AlignmentEvent = merge1[nidx].clone();
                         // dbg!(&cigar,&a,&b, b.lend.abs_diff(a.rstart));
-                        if b.lend.abs_diff(a.rstart) < cli.merge_min
-                            && (a.svtype == AlignEventType::Del && b.svtype == AlignEventType::Del)
+                        if prv.lend.abs_diff(target.rstart) < cli.merge_min
+                            && (target.svtype == AlignEventType::Del
+                                && prv.svtype == AlignEventType::Del)
                         {
                             let c: AlignmentEvent = AlignmentEvent {
-                                lchrom: a.lchrom,
-                                lstart: a.lstart,
-                                lend: a.lend,
-                                lstrand: a.lstrand,
-                                rchrom: b.rchrom,
-                                rstart: b.rstart,
-                                rend: b.rend,
-                                rstrand: b.rstrand,
-                                events_num: 1,
+                                lchrom: prv.lchrom,
+                                lstart: prv.lstart,
+                                lend: prv.lend,
+                                lstrand: prv.lstrand,
+                                rchrom: target.rchrom,
+                                rstart: target.rstart,
+                                rend: target.rend,
+                                rstrand: target.rstrand,
+                                events_num: 1, // hard code 1, STIX will parse it as a split-event.
                                 svtype: AlignEventType::Del,
                             };
+                            // merge2.push(c);
                             merge2.push(c);
+                            idx += 1;
+                        } else if target.lend.abs_diff(nxt.rstart) < cli.merge_min
+                            && (target.svtype == AlignEventType::Del
+                                && nxt.svtype == AlignEventType::Del)
+                        {
+                            let c: AlignmentEvent = AlignmentEvent {
+                                lchrom: target.lchrom,
+                                lstart: target.lstart,
+                                lend: target.lend,
+                                lstrand: target.lstrand,
+                                rchrom: nxt.rchrom,
+                                rstart: nxt.rstart,
+                                rend: nxt.rend,
+                                rstrand: nxt.rstrand,
+                                events_num: 1, // hard code 1, STIX will parse it as a split-event.
+                                svtype: AlignEventType::Del,
+                            };
+                            // merge2.push(c);
+                            merge2.push(c);
+                            idx += 1;
                         } else {
-                            merge2.push(a);
-                            merge2.push(b);
+                            merge2.push(prv);
+                            merge2.push(target);
+                            merge2.push(nxt);
+                            idx += 1;
                         }
                     }
+
                     if merge1.len() == merge2.len() {
                         break;
                     } else if iter_times <= 0 {
                         break;
                     } else {
                         merge1 = merge2.clone();
+                        merge2.clear();
                     }
+                    merged_alignments_event_vec = merge2.clone();
                 }
+
+                // merged_alignments_event_vec.dedup_by(same_bucket)
             } else if alignments_event_vec.len() == 1 {
                 let a: AlignmentEvent = alignments_event_vec[0usize].clone();
                 merged_alignments_event_vec.push(a);
-                // let ddd = format!("## alignment_vec:{:?}\n",
-                // &alignments_event_vec
-                // );
-                // f.write(&ddd.as_bytes()).unwrap();
             }
+
             merged_alignments_event_vec.into_iter().for_each(|x| {
-                let rrr = get_alignment_event_record(&x, &cli.verbose, &record, &strand,&"excord-lr-alignment-event");
+                let rrr = get_alignment_event_record(
+                    &x,
+                    &cli.verbose,
+                    &record,
+                    &strand,
+                    &"excord-lr-alignment-event",
+                );
 
                 f.write(rrr.as_bytes()).unwrap();
             });
