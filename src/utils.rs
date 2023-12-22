@@ -281,3 +281,9 @@ pub fn get_alignment_split_record(
     }
     return bed_line;
 }
+
+
+// fn merge_two_alignment_event(a:&AlignmentEvent,b:&AlignmentEvent)->Vec<AlignmentEvent> {
+    
+
+// }

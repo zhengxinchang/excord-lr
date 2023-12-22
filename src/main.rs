@@ -29,7 +29,7 @@ use std::str;
 #[derive(Parser, Debug)]
 #[command(name = "excord-LR")]
 #[command(author = "Xinchang Zheng <zhengxc93@gmail.com>")]
-#[command(version = "0.1.15")]
+#[command(version = "0.1.16")]
 #[command(about = "
 Extract Structural Variation Signals from Long-Read BAMs
 Contact: Xinchang Zheng <zhengxc93@gmail.com,Xinchang.Zheng@bcm.edu>
@@ -38,6 +38,10 @@ struct Cli {
     /// Path to BAM file
     #[arg(short, long)]
     bam: PathBuf,
+
+    /// Path to reference, used for CRAM file
+    #[arg(short, long)]
+    reference:Option<PathBuf>,
 
     /// Minimal MapQ
     #[arg(short = 'Q', long, default_value_t = 1)]
@@ -107,6 +111,10 @@ fn main() {
         println!("Ivalid BAM file path: {} ", _bam.to_str().unwrap());
         exit(1)
     }
+
+
+
+
     // handel -o option
     let t = cli.out;
     let mut _outprefix_ancestors = t.ancestors().clone();
@@ -121,7 +129,25 @@ fn main() {
         exit(1);
     }
     let mut f = BufWriter::new(File::create(t).unwrap());
-    let mut bam = bam::Reader::from_path(_bam).unwrap();
+
+    let mut bam = bam::Reader::from_path(&_bam).unwrap();
+
+
+
+    if _bam.to_str().unwrap().to_lowercase().contains(&".cram".to_string()) {
+        match cli.reference {
+            Some(reference)=>{
+                bam.set_reference(reference).unwrap();
+            },
+            None =>{
+                println!("excord-lr is running on CRAM file, reference(-r) is required.");
+                exit(1)
+            }
+        }
+    }
+
+    
+
     bam.set_threads(cli.thread).unwrap();
     let mut record = Record::new();
 
