@@ -75,3 +75,7 @@ tmiss:build
 
 tmiss2:build
 	time target/x86_64-unknown-linux-musl/release/excord-lr --verbose  -b test/20-62184901-62185021_large.bam  -o test/20-62184901-62185021_large.bed
+
+	
+thard:build
+	time target/x86_64-unknown-linux-musl/release/excord-lr --verbose  -b test/hardclip.bam  -o test/hardclip.bed

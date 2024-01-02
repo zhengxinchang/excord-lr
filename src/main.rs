@@ -29,7 +29,7 @@ use std::str;
 #[derive(Parser, Debug)]
 #[command(name = "excord-LR")]
 #[command(author = "Xinchang Zheng <zhengxc93@gmail.com>")]
-#[command(version = "0.1.16")]
+#[command(version = "0.1.17")]
 #[command(about = "
 Extract Structural Variation Signals from Long-Read BAMs
 Contact: Xinchang Zheng <zhengxc93@gmail.com,Xinchang.Zheng@bcm.edu>
@@ -70,6 +70,10 @@ struct Cli {
     /// Threshold to merge two adjacent events
     #[arg(short, long, default_value_t = 5)]
     merge_min: u32,
+
+    /// Minimal length of hard-clip and soft-clip to define a large insertion signal
+    #[arg(short, long, default_value_t = 1000)]
+    ins_clip_min: u32,
 
     /// Not merge
     #[arg(short, long, default_value_t = false)]
@@ -340,23 +344,40 @@ fn main() {
                     //2. Must have overlap
 
                     // 3. Both alignment should have a soft-clip more than 1kp.
-                    if *a.cigar_map.get(&'S').unwrap() > 1000u32 {
+                    if *a.cigar_map.get(&'S').unwrap() > cli.ins_clip_min || *a.cigar_map.get(&'H').unwrap() > cli.ins_clip_min {
                         if a.chrom == b.chrom {
                             if a.strand == b.strand {
                                 // if overlap > max_pct_overlap. default value of max_pct_overlap is 0 ,means each overlap pass the examination.
                                 if overlap(&a.start, &a.end, &b.start, &b.end, cli.max_pct_overlap)
                                 {
-                                    if *b.cigar_map.get(&'S').unwrap() > 1000u32 {
+                                    if *b.cigar_map.get(&'S').unwrap() > cli.ins_clip_min || *b.cigar_map.get(&'H').unwrap() > cli.ins_clip_min {
                                         // will generate a new alignment event
+                                        
+
+                                        /*
+                                        Linking id (READNAME) = f2720f51-47ee-4dad-91d2-3f2aa26a66d0
+                                        Haplotype = 2
+                                        # alignments = 2
+                                        Total span = 46,603bp
+                                        Strands = ++
+                                        chr2:9,832,511-9,877,850 (+) = 45,339BP @MAPQ=60 NM=2886 CLIPPING=32S ... 8269S
+                                        chr2:9,877,576-9,879,114 (+) = 1,538BP @MAPQ=60 NM=191 CLIPPING=51421H ... 14H
+                                         */
+
+                                         // make sure the insertion presents in the middile of two segments
+                                        let mut pos_list = vec![a.start.clone(),a.end.clone(),b.start.clone(),b.end.clone()];
+
+                                        pos_list.sort();
+
 
                                         let x = AlignmentEvent {
                                             lchrom: a.chrom.clone(),
-                                            lstart: a.start as u32,
-                                            lend: a.end as u32,
+                                            lstart: pos_list[0].clone() as u32,
+                                            lend: pos_list[1].clone() as u32,
                                             lstrand: a.strand,
                                             rchrom: b.chrom.clone(),
-                                            rstart: a.end as u32,
-                                            rend: a.end as u32, // TODO: should estimate the length of insertions and add it at here. [done]
+                                            rstart: pos_list[1].clone() as u32,
+                                            rend: pos_list[1].clone() as u32, // TODO: should estimate the length of insertions and add it at here. [done]
                                             rstrand: b.strand,
                                             events_num: 1,
                                             svtype: AlignEventType::Ins,
@@ -368,10 +389,37 @@ fn main() {
                                             &cli.verbose,
                                             &record,
                                             &strand,
-                                            &"excord-lr-alignment-event-large-ins",
+                                            &"excord-lr-alignment-event-large-ins-two-alignments",
                                         );
 
                                         f.write(rrr.as_bytes()).unwrap();
+
+
+                                        let x = AlignmentEvent {
+                                            lchrom: a.chrom.clone(),
+                                            lstart: pos_list[0].clone() as u32,
+                                            lend: pos_list[2].clone() as u32,
+                                            lstrand: a.strand,
+                                            rchrom: b.chrom.clone(),
+                                            rstart: pos_list[2].clone() as u32,
+                                            rend: pos_list[2].clone() as u32, // TODO: should estimate the length of insertions and add it at here. [done]
+                                            rstrand: b.strand,
+                                            events_num: 1,
+                                            svtype: AlignEventType::Ins,
+                                        };
+
+                                        // alignment_vec.clear();
+                                        let rrr = get_alignment_event_record(
+                                            &x,
+                                            &cli.verbose,
+                                            &record,
+                                            &strand,
+                                            &"excord-lr-alignment-event-large-ins-two-alignments",
+                                        );
+
+                                        f.write(rrr.as_bytes()).unwrap();
+
+
                                     }
                                 }
                             }
@@ -394,7 +442,7 @@ fn main() {
                                 &cli.verbose,
                                 &record,
                                 &strand,
-                                &"excord-lr-alignment-event-large-ins",
+                                &"excord-lr-alignment-event-large-ins-one-alignments",
                             );
 
                             f.write(rrr.as_bytes()).unwrap();
@@ -410,7 +458,7 @@ fn main() {
 
                 if alignment_vec.len() == 1 {
                     let a = alignment_vec.first().clone().unwrap();
-                    if *a.cigar_map.get(&'S').unwrap() > 1000u32 {
+                    if *a.cigar_map.get(&'S').unwrap() > cli.ins_clip_min || *a.cigar_map.get(&'H').unwrap() > cli.ins_clip_min {
                         // alignments_event_vec.push();
                         let x = AlignmentEvent {
                             lchrom: a.chrom.clone(),
