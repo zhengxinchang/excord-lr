@@ -47,3 +47,27 @@ Options:
           Print version
 ```
 
+
+# Install
+
+Please check the relase page to find the latest version.
+
+# Build
+
+We recommend users build excord-lr with [musl libc](https://musl.libc.org/). The binary works for the most of linux distributions.
+
+
+```
+apt install musl-tools
+
+rustup target add x86_64-unknown-linux-musl
+
+CC=/usr/bin/musl-gcc  cargo build --release --target=x86_64-unknown-linux-musl
+```
+
+You can still build excord-lr in a normal way by this:
+
+```
+ cargo build --release
+```
+
