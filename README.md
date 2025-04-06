@@ -58,7 +58,9 @@ We recommend users build excord-lr with [musl libc](https://musl.libc.org/). The
 
 
 ```
-apt install musl-tools
+sudo apt install musl-tools
+sudo apt install build-essential
+sudo apt install clang libclang-dev
 
 rustup target add x86_64-unknown-linux-musl
 
