@@ -163,7 +163,7 @@ fn main() {
         // dbg!(str::from_utf8(&record.qname()).unwrap());
 
         match result {
-            Err(_) => break, //exit if the last one was processed.
+            Err(_) => continue, // continue if the current record is broken.
             Ok(()) => {}
         }
         if cli.exclude_secondary & record.is_secondary() {
